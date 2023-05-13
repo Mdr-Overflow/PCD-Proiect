@@ -286,7 +286,7 @@ void performMPUT(int server_socket) {
         closedir(d);
     }
     printf("MPUT Complete\n");
-}
+} 
 
 // Callback when a new connection is set up
 void *ConnectionHandler(void *socket_desc)
