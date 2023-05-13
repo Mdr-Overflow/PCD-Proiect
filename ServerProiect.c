@@ -134,6 +134,27 @@ CREATE TABLE IF NOT EXISTS Logs (\
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 
+/// UTILS
+
+
+
+void removeWhitespace(char *str) {
+    char *src = str, *dst = str;
+    while (*src != '\0') {
+        if (*src == ' ' || *src == '\n') {
+            src++;
+        } else {
+            *dst++ = *src++;
+        }
+    }
+    *dst = '\0';
+}
+
+
+
+//
+
+
 
 void SetupDataBase(){
 
@@ -210,7 +231,7 @@ void SetupDataBase(){
 
 void getUserInfo(char * username, char * pass) {
     
-    printf("PPPPPPPPPPPPPPPPPPPP");
+
     sqlite3 *db;
     int rc = sqlite3_open("pcdProiect.db", &db);
     if (rc != SQLITE_OK) {
@@ -228,31 +249,27 @@ void getUserInfo(char * username, char * pass) {
         exit(1);
     }
 
+    removeWhitespace(username);
+
     rc = sqlite3_bind_text(stmt, 1, username, -1, SQLITE_TRANSIENT);
     int step = sqlite3_step(stmt);
-
-    // char *Uname = malloc(sizeof(char) * MAXUNAME);
-    // Uname = NULL;
-    // char *Pass = malloc(sizeof(char) * MAXUNAME);
-    // Pass = NULL;
-    
+  
     //printf("%s <0000 \n",username); GETS HERE
-    if (step == SQLITE_ROW) { // WONT ENTER
-        
-        printf("%s <0000 \n",username);
+    // if (step == SQLITE_ROW) { // WONT ENTER
+     
         strcpy(pass,sqlite3_column_text(stmt, 0));
-        printf("%s <1111 \n",username);
+ 
        
         printf("%s\n ", username);
         printf("%s\n ", pass);
-    } 
+    // } 
     // if nothing found
-    else {
-        // Problem WAS here
-        strcpy(username,"NaN");
-        strcpy(pass,"NaN");
+    // else {
+    //     // Problem WAS here
+    //     strcpy(username,"NaN");
+    //     strcpy(pass,"NaN");
         
-    }
+    // }
     sqlite3_finalize(stmt);
     sqlite3_close(db);
     
@@ -294,6 +311,7 @@ bool isAuthUNAME(pid_t clientPID, char * ClientUserName ){
     char * pass = malloc(sizeof(char) * MAXUNAME);
     // pass = NULL; DONT DO THIS IF U WANT TO COPY ON TOP OF IT
     getUserInfo(ClientUserName,pass);
+    printf("uname is = %s \n", ClientUserName);
     if ( strcmp(ClientUserName,"NaN") == 0 || strcmp(ClientUserName,ILLEGALMESSAGE) == 0 ){
         return false;
     }
@@ -315,17 +333,7 @@ bool isAuthPASS(pid_t clientPID, char * ClientUserName , char * ClientPassword){
 
 }
 
-void removeWhitespace(char *str) {
-    char *src = str, *dst = str;
-    while (*src != '\0') {
-        if (*src == ' ' || *src == '\n') {
-            src++;
-        } else {
-            *dst++ = *src++;
-        }
-    }
-    *dst = '\0';
-}
+
 
 void PostUsername(char * Uname){
 
@@ -421,10 +429,12 @@ bool createUNAME(pid_t uname , char * ClientUserName){
 bool createPASS(pid_t uname , char * ClientUserName, char * Pass){
     
     PostPass(Pass, ClientUserName);
-    if ( (Pass,ILLEGALMESSAGE) == 0  || Pass == NULL){
-        return true;
+    // fails here
+  
+    if ( strcmp(Pass,ILLEGALMESSAGE) == 0  || Pass == NULL){
+        return false;
     }
-    else false;
+    else true;
 
 
 }
@@ -690,7 +700,7 @@ int main(int argc, char * argv[]) {
 
                 if (authstate == 101){
 
-                    if ( createPASS(getpid(),Uname,line))
+                    if ( createPASS(getpid(),Uname,line) == true)
                     {
 
                         send(newsockfd, "Login Successful", strlen("Login Successful"), 0);
