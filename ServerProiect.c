@@ -231,7 +231,7 @@ void SetupDataBase(){
 
 void getUserInfo(char * username, char * pass) {
     
-
+  //  printf("PAAAAAARCHET \n");
     sqlite3 *db;
     int rc = sqlite3_open("pcdProiect.db", &db);
     if (rc != SQLITE_OK) {
@@ -253,26 +253,27 @@ void getUserInfo(char * username, char * pass) {
 
     rc = sqlite3_bind_text(stmt, 1, username, -1, SQLITE_TRANSIENT);
     int step = sqlite3_step(stmt);
+
   
     //printf("%s <0000 \n",username); GETS HERE
     // if (step == SQLITE_ROW) { // WONT ENTER
-     
+        if ( step == SQLITE_ROW){
         strcpy(pass,sqlite3_column_text(stmt, 0));
- 
-       
+      
         printf("%s\n ", username);
         printf("%s\n ", pass);
+        }
     // } 
     // if nothing found
-    // else {
-    //     // Problem WAS here
-    //     strcpy(username,"NaN");
-    //     strcpy(pass,"NaN");
+    else {
+         // Problem WAS here
+         strcpy(username,"NaN");
+         strcpy(pass,"NaN");
         
-    // }
+     }
     sqlite3_finalize(stmt);
     sqlite3_close(db);
-    
+   // printf("CCCCCCCCCC  \n");
     //free(Uname);
     //free(Pass);
 
@@ -326,7 +327,9 @@ bool isAuthPASS(pid_t clientPID, char * ClientUserName , char * ClientPassword){
     // Initial nu criptam ca sa fie mai usor !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     encrypt(ClientPassword);
     getUserInfo(ClientUserName,pass);
-    if ( strcmp(pass,ClientPassword)){
+    printf("\nPASS IS = %s \n",pass);
+    printf("\nTyped Pass IS = %s \n",ClientPassword);
+    if ( strcmp(pass,ClientPassword) == 0){
         return true;
     }
     else false;
@@ -515,7 +518,7 @@ int main(int argc, char * argv[]) {
 
   int authstate = 0;
   char * Uname = malloc(sizeof(char) * MAXUNAME); 
-
+  int stage = 0;
 
   /**
   bind - realizează legătura între un descriptor de soclu anterior creat şi o adresă locală finală de
@@ -566,7 +569,8 @@ int main(int argc, char * argv[]) {
 
         {
           line[strlen(line)+1] = '\0'; // set EOB - end buffer
-          
+
+
     /*
 
     if(illegalCheck(pass)){ Send("FUCK YOU"); Continue; }
@@ -574,6 +578,7 @@ int main(int argc, char * argv[]) {
     */
 
             removeWhitespace(Uname);
+            printf("line = %s\n",line );
 
           //  printf("OOOOOOOOOOOOOOO\n");
 
@@ -652,7 +657,7 @@ int main(int argc, char * argv[]) {
 
                 if (authstate == 111){
 
-                    if ( isAuthPASS(getpid(),Uname,line))
+                    if ( isAuthPASS(getpid(),Uname,line) == true)
                     {
 
                         send(newsockfd, "Login Successful", strlen("Login Successful"), 0);
