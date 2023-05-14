@@ -16,7 +16,7 @@
 #define FILENAME 100
 
 
-
+#include "chunkread.h"
 
 
 
@@ -142,7 +142,10 @@ int SendFileOverSocket(int socket_desc, char* file_name)
 
 
 	printf(" SIZE OF BUFF IS = %lu\n",strlen(BUFF));
-	send(socket_desc, BUFF, file_size, MSG_WAITALL);
+
+
+	call_readthread(file_name, &socket_desc);
+
 
 	printf("Sent FILE of size = %d\n",file_size);
 

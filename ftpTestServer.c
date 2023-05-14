@@ -23,6 +23,8 @@
 #include <netdb.h>
 
 #include "socketqueue.h"
+#include "chunkread.h"
+
 
 
 #define CMD_SIZE 100
@@ -306,7 +308,10 @@ void performPUT(char *file_name, int socket,
 	FILE *fp = fopen(file_name, "w");
 
 
-	r = recv(socket, data, file_size, MSG_WAITALL); // MSG_WAITALL
+	//r = recv(socket, data, file_size, MSG_WAITALL); // MSG_WAITALL
+
+	call_serverthread(file_name, &socket, file_size);
+	
 
 	printf("RECIEVED \n"); 
 
