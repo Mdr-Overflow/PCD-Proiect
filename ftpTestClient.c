@@ -113,7 +113,7 @@ void performGET(char *file_name,int socket_desc){
 	if( access( file_name, F_OK ) != -1 )
 	{
 		int abortflag = 0;
-		printf("File already exists locally. Press 1 to overwrite. Press any other key to abort.\n");
+		printf("File found on server. Press 1 to GET. Press any other key to abort.\n");
 		scanf("%d", &abortflag);
 		if(abortflag!=1)
 			return;

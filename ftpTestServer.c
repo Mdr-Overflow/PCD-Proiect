@@ -144,7 +144,7 @@ int main(int argc, char **argv)
         pthread_cond_t run_cond_FILE = PTHREAD_COND_INITIALIZER;
         char * filename = (char *)malloc(FILENAME);
 
-        FTPthreadArgs_t * ARG;
+        FTPthreadArgs_t  *ARG = (FTPthreadArgs_t *) malloc(sizeof(FTPthreadArgs_t));
         ARG->filename = filename;
         ARG->run_cond_FILE = run_cond_FILE;
         ARG->run_lock_FILE = run_lock_FILE;
@@ -163,6 +163,7 @@ int main(int argc, char **argv)
 		return 1;
 	}
 
+    
     free(ThreadARGS);
 
     for (int i = 0 ; i< MAXCON ; i++)
@@ -274,9 +275,11 @@ void performPUT(char *file_name, int socket,
      // Send a message to the client until it's done
      // DURERE DE CAP MASIVA !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
           pthread_mutex_lock(&(args->run_lock_FILE));
+          printf("BIG PROBLEM");
           for (int i = 0 ; i< MAXCON ; i++) {
             while ((ThreadARGS[i]->run_thread_FILE) == 1 && strcmp(file_name , ThreadARGS[i]->filename) == 0){
                                 pthread_cond_wait(&(args->run_cond_FILE), &(args->run_lock_FILE));
+                                printf("Waiting on file %s , for thread %d" , file_name , i);
             }
                 }
 
@@ -302,11 +305,12 @@ void performPUT(char *file_name, int socket,
 	r = fputs(data, fp);
 	fclose(fp);
 
-        // 
+        // UNLOCK MUTEX AND SHARE THAT BY SIGNAL
         args->run_thread_FILE = 0;
         pthread_mutex_unlock(&(args->run_lock_FILE));
         args->filename = "NaN";
-        pthread_cond_signal(&(args->run_cond_FILE));
+           for (int i = 0 ; i< MAXCON ; i++)
+                 pthread_cond_signal(&(ThreadARGS[i]->run_cond_FILE));
         
 }
 void performMGET(int socket,char* file_ext){
@@ -452,10 +456,14 @@ bool SendFileOverSocket(int socket_desc, char* file_name)
 	printf("Sending File...\n");
 	stat(file_name, &obj);
 
-	// Open file
-	file_desc = open(file_name, O_RDONLY);
-	// Send file size
+	
 	file_size = obj.st_size;
+    // Open file
+	file_desc = open(file_name, O_RDONLY);
+	
+    // Send file size
+
+    printf("file size is = %d\n", file_size);             ////////////////////// WTF ??????????
 	write(socket_desc, &file_size, sizeof(int));
 	// Send File
 	sendfile(socket_desc, file_desc, NULL, file_size);
