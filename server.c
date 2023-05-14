@@ -24,7 +24,6 @@
 
 
 
-
 void *ConnectionHandler(void *socket_desc);
 char* GetArgumentFromRequest(char* request);
 bool SendFileOverSocket(int socket_desc, char* file_name);
@@ -265,7 +264,7 @@ void performMPUT(int server_socket) {
     d = opendir(".");
     char full_name[100];
     if (d) {
-          clock_t start_time = clock();
+      //    clock_t start_time = clock();
           
         while ((dir = readdir(d)) != NULL) {
             strcpy(full_name, dir->d_name);

@@ -29,9 +29,23 @@
 #define MAXFILE 100
 #define FILENAME 100
 #define MAXHOSTNAME 256
+#define MAXCON 10
 
 
 
+
+typedef struct FTPthreadArgs{
+
+int run_thread_FILE; //= 0;
+pthread_mutex_t run_lock_FILE ;//= PTHREAD_MUTEX_INITIALIZER;
+pthread_cond_t run_cond_FILE ;//= PTHREAD_COND_INITIALIZER;
+char * filename;
+int * socket_d;
+
+}FTPthreadArgs_t;
+
+
+FTPthreadArgs_t ** ThreadARGS;
 
 void *ConnectionHandler(void *socket_desc);
 char* GetArgumentFromRequest(char* request);
@@ -85,6 +99,16 @@ int main(int argc, char **argv)
     memset(NumeHostServer, 0, sizeof(NumeHostServer));
     gethostname(NumeHostServer, MAXHOSTNAME);
     printf("\n----TCPServer startat pe hostul: %s\n", NumeHostServer);
+    // NUMBER OF CONN!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    int con = 0;
+
+        // LEAST ANNOYING C CODE 
+        ThreadARGS = (FTPthreadArgs_t **)malloc(MAXCON * sizeof(FTPthreadArgs_t *));
+    for (int i = 0 ;i< MAXCON ; i++)
+        {
+          ThreadARGS[i] = (FTPthreadArgs_t*) malloc(sizeof(FTPthreadArgs_t));      
+
+        }
 
     struct hostent *he = gethostbyname(NumeHostServer);
     if (he == NULL)
@@ -94,7 +118,7 @@ int main(int argc, char **argv)
     }
     printf("\t(TCPServer INET ADDRESS (IP) este: %s)\n", inet_ntoa(*(struct in_addr *)he->h_addr));
 
-    if (listen(socket_desc, 5) < 0)
+    if (listen(socket_desc, MAXCON) < 0)
     {
         perror("Listen failed");
         return 1;
@@ -107,7 +131,29 @@ int main(int argc, char **argv)
 		pthread_t sniffer_thread;
 		new_sock = malloc(1);
 		*new_sock = socket_client;
-		pthread_create(&sniffer_thread, NULL, ConnectionHandler, (void*) new_sock);
+
+        if (con < 10){
+          con++;
+        }
+        else {
+          con = 0;
+        }
+
+        int run_thread_FILE = 0 ;
+        pthread_mutex_t run_lock_FILE = PTHREAD_MUTEX_INITIALIZER;
+        pthread_cond_t run_cond_FILE = PTHREAD_COND_INITIALIZER;
+        char * filename = (char *)malloc(FILENAME);
+
+        FTPthreadArgs_t * ARG;
+        ARG->filename = filename;
+        ARG->run_cond_FILE = run_cond_FILE;
+        ARG->run_lock_FILE = run_lock_FILE;
+        ARG->run_thread_FILE = 0;
+        ARG->socket_d = new_sock;
+
+        ThreadARGS[con] = ARG;
+
+		pthread_create(&sniffer_thread, NULL, ConnectionHandler, (void*) ARG);
 		pthread_join(sniffer_thread, NULL);
 	}
 	 
@@ -116,6 +162,11 @@ int main(int argc, char **argv)
 		perror("Accept failed");
 		return 1;
 	}
+
+    free(ThreadARGS);
+
+    for (int i = 0 ; i< MAXCON ; i++)
+     free(ThreadARGS[i]);
 
 	return 0;
 }
@@ -178,9 +229,18 @@ void performGET(char *file_name, int socket)
 	}
 }
 
-void performPUT(char *file_name, int socket)
+void performPUT(char *file_name, int socket, 
+ FTPthreadArgs_t *args )
 {
 	int c,r;
+
+    // set up local copies of the mutex things
+    // int * run_thread_FILE -> args.run_thread_FILE;
+    // pthread_mutex_t * run_lock_FILE = args.run_lock_FILE;
+    // pthread_cond_t * run_cond_FILE = args.run_cond_FILE;
+    args->filename = file_name;
+
+
 	printf("Performing PUT request of client\n");
 
 	char server_response[BUFSIZ], client_response[BUFSIZ];
@@ -200,6 +260,7 @@ void performPUT(char *file_name, int socket)
 		}
 		printf("User says to overwrite the file.\n");
 
+       
 	}
 	else
 	{
@@ -208,13 +269,30 @@ void performPUT(char *file_name, int socket)
 		write(socket, server_response, strlen(server_response));
 	}
 
+   // Lock the mutex before accessing the file
+    // check if file is accessed by any of the possible threads
+     // Send a message to the client until it's done
+     // DURERE DE CAP MASIVA !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+          pthread_mutex_lock(&(args->run_lock_FILE));
+          for (int i = 0 ; i< MAXCON ; i++) {
+            while ((ThreadARGS[i]->run_thread_FILE) == 1 && strcmp(file_name , ThreadARGS[i]->filename) == 0){
+                                pthread_cond_wait(&(args->run_cond_FILE), &(args->run_lock_FILE));
+            }
+                }
+
+         args->run_thread_FILE = 1;
+         
+
+
 	// Getting File 
 	
+
 	int file_size;
 	char *data;
 	// Recieving file size and allocating memory
 	recv(socket, &file_size, sizeof(int), 0);
 	data = malloc(file_size+1);
+    
 
 	// Creating a new file, receiving and storing data in the file.
 	FILE *fp = fopen(file_name, "w");
@@ -223,6 +301,13 @@ void performPUT(char *file_name, int socket)
 	printf("Size of file recieved is %d\n",r);
 	r = fputs(data, fp);
 	fclose(fp);
+
+        // 
+        args->run_thread_FILE = 0;
+        pthread_mutex_unlock(&(args->run_lock_FILE));
+        args->filename = "NaN";
+        pthread_cond_signal(&(args->run_cond_FILE));
+        
 }
 void performMGET(int socket,char* file_ext){
 
@@ -259,7 +344,7 @@ void performMGET(int socket,char* file_ext){
     }
 }
 
-void performMPUT(int server_socket) {
+void performMPUT(int server_socket, FTPthreadArgs_t * args) {
     printf("Performing MPUT\n");
 
     char ext[BUFSIZ], request_msg[BUFSIZ];
@@ -274,14 +359,18 @@ void performMPUT(int server_socket) {
     char full_name[100];
     if (d) {
           clock_t start_time = clock();
-          
+                            
         while ((dir = readdir(d)) != NULL) {
             strcpy(full_name, dir->d_name);
+
+            args->filename = full_name;
+
+
 
             p1 = strtok(dir->d_name, ".");
             p2 = strtok(NULL, ".");
             if (p2 != NULL && strcmp(p2, ext) == 0)
-                performPUT(full_name, server_socket);
+                performPUT(full_name, server_socket,args);
         }
         closedir(d);
     }
@@ -289,10 +378,26 @@ void performMPUT(int server_socket) {
 } 
 
 // Callback when a new connection is set up
-void *ConnectionHandler(void *socket_desc)
+void *ConnectionHandler(void * ARGS)
 {
+
+    FTPthreadArgs_t *args = (FTPthreadArgs_t *)ARGS;
+
+    
+    // socket
+    int  socket_desc = *(args->socket_d);
+
+
+    // mutex and cond
+    
+
+    /*
+    int run_thread_FILE = 0;
+    pthread_mutex_t run_lock_FILE = PTHREAD_MUTEX_INITIALIZER;
+    pthread_cond_t run_cond_FILE = PTHREAD_COND_INITIALIZER; */
+
 	int	choice, file_desc, file_size;
-	int socket = *(int*)socket_desc;
+	int socket = socket_desc;
 
 	char reply[BUFSIZ], file_ext[BUFSIZ],server_response[BUFSIZ], client_request[BUFSIZ], file_name[BUFSIZ];
 	char *data;
@@ -310,7 +415,7 @@ void *ConnectionHandler(void *socket_desc)
 				break;
 			case 2:
 				strcpy(file_name, GetArgumentFromRequest(client_request));
-				performPUT(file_name, socket);
+				performPUT(file_name, socket, args);
 				break;
 			case 3:
 				strcpy(file_ext, GetArgumentFromRequest(client_request));
@@ -318,18 +423,18 @@ void *ConnectionHandler(void *socket_desc)
 				break;
 			case 4:
             	strcpy(file_ext, GetArgumentFromRequest(client_request));
-                performMPUT(socket);
+                performMPUT(socket,args);
 			
 				break;
 			case 5:
 				// showFile(socket);
 				break;
 			case 6:
-				free(socket_desc);   
+				//free(socket_desc);   
 				return 0;
 		}
 	}
-	free(socket_desc);   
+// //	free(socket_desc);   
 	return 0;
 }
 

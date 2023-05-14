@@ -163,13 +163,13 @@ void performPUT(char *file_name,int socket_desc)
 		reply_msg[t]='\0';
 		if (strcmp(reply_msg, "OK") == 0)
 		{
-			// Everything if fine and send file
+			// Everything is fine and send file
 			SendFileOverSocket(socket_desc, file_name);
 		}
 		else if(strcmp(reply_msg, "FP") == 0)
 		{
 			// File present at server.
-			printf("File exists in server. Do you wan't to overwrite? 1/0\n");
+			printf("File exists in server. Do you want to overwrite? 1/0\n");
 			scanf("%d", &c);
 			if(c)
 			{
@@ -231,7 +231,7 @@ void performMGET(int socket_desc){
 			printf("File already exists. Press 1 to overwrite. Press any other key to abort.\n");
 			scanf("%d", &abortflag);
 			if(abortflag!=1){
-				// Send "NO" is user doesn't want to overwrite
+				// Send "NO" if user doesn't want to overwrite
 				strcpy(reply,"NO");
 				write(socket_desc,reply,2);
 				printf("Not Overwriting %s \n",file_name);
@@ -239,7 +239,7 @@ void performMGET(int socket_desc){
 			}
 			printf("Overwriting %s\n",file_name );
 		}
-		// Send "OK" if user wantes to overwrite
+		// Send "OK" if user wants to overwrite
 		strcpy(reply,"OK");
 		write(socket_desc,reply,2);
 		
@@ -257,10 +257,15 @@ void performMGET(int socket_desc){
 			fputs(data, fp);
 			fclose(fp);
 			printf("File %s received with size %d\n", file_name,r);
-		}
-		else
-			printf("This shouldn't have happen as we are sure file is present at server.\n" );
+		}   //////////// HERE
+		else if (strcmp(reply, "OK") == 0 ){
+			printf("File is being overwritten by another client .\n" );
+        }
+        else 
+            {
+                    printf("It seems some error occured .\n" );
 
+            }
 	}
 	printf("MGET Complete\n");
 
