@@ -22,14 +22,14 @@
 
 #include <netdb.h>
 
-
+#include "socketqueue.h"
 
 
 #define CMD_SIZE 100
 #define MAXFILE 100
 #define FILENAME 100
 #define MAXHOSTNAME 256
-#define MAXCON 10
+#define MAXCON 10 
 
 
 
@@ -131,6 +131,7 @@ int main(int argc, char **argv)
 		pthread_t sniffer_thread;
 		new_sock = malloc(1);
 		*new_sock = socket_client;
+		printf("socket is %d",socket_client);
 
         if (con < 10){
           con++;
@@ -154,8 +155,10 @@ int main(int argc, char **argv)
         ThreadARGS[con] = ARG;
 
 		pthread_create(&sniffer_thread, NULL, ConnectionHandler, (void*) ARG);
-		pthread_join(sniffer_thread, NULL);
+		
 	}
+
+	//pthread_join(sniffer_thread, NULL);
 	 
 	if (socket_client<0)
 	{
@@ -294,14 +297,25 @@ void performPUT(char *file_name, int socket,
 	char *data;
 	// Recieving file size and allocating memory
 	recv(socket, &file_size, sizeof(int), 0);
-	data = malloc(file_size+1);
-    
+
+    printf("Received file size = %d\n",file_size);
+	data = (char *)malloc(sizeof(char) * file_size);
+    // printf("AAAAAAAAAAA \n"); TRECE 
 
 	// Creating a new file, receiving and storing data in the file.
 	FILE *fp = fopen(file_name, "w");
-	r = recv(socket, data, file_size, 0);
+
+
+	r = recv(socket, data, file_size, MSG_WAITALL); // MSG_WAITALL
+
+	printf("RECIEVED \n"); 
+
 	data[r] = '\0';
 	printf("Size of file recieved is %d\n",r);
+
+    // 
+   // printf("size of data = %ld" , strlen(data));
+
 	r = fputs(data, fp);
 	fclose(fp);
 
@@ -393,12 +407,7 @@ void *ConnectionHandler(void * ARGS)
 
 
     // mutex and cond
-    
-
-    /*
-    int run_thread_FILE = 0;
-    pthread_mutex_t run_lock_FILE = PTHREAD_MUTEX_INITIALIZER;
-    pthread_cond_t run_cond_FILE = PTHREAD_COND_INITIALIZER; */
+ 
 
 	int	choice, file_desc, file_size;
 	int socket = socket_desc;
@@ -435,11 +444,11 @@ void *ConnectionHandler(void * ARGS)
 				break;
 			case 6:
 				//free(socket_desc);   
-				return 0;
+				pthread_exit(NULL);
 		}
 	}
 // //	free(socket_desc);   
-	return 0;
+	pthread_exit(NULL);
 }
 
 char* GetArgumentFromRequest(char* request)
@@ -460,7 +469,7 @@ bool SendFileOverSocket(int socket_desc, char* file_name)
 	file_size = obj.st_size;
     // Open file
 	file_desc = open(file_name, O_RDONLY);
-	
+
     // Send file size
 
     printf("file size is = %d\n", file_size);             ////////////////////// WTF ??????????

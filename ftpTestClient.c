@@ -10,9 +10,15 @@
 #include <dirent.h>
 #include <stdio.h>
 #include <string.h>
+#include <errno.h>
 
 #define MAXFILE 100
 #define FILENAME 100
+
+
+
+
+
 
 
 
@@ -91,6 +97,28 @@ int main(int argc , char **argv)
 	return 0;
 }
 
+ssize_t readall(int fd, char *buf, size_t bytes)
+ {
+     ssize_t bytes_read = 0;
+     ssize_t n=0;
+
+     do {
+         if ((n = read(fd,
+                       &buf[bytes_read],
+                       bytes - bytes_read)) == -1)
+         {
+             if (errno == EINTR)  // resume on INTR
+                 continue;
+             else
+                 return -1;
+         }
+         if (n == 0)
+             return bytes_read;
+         bytes_read += n;
+     } while (bytes_read < bytes);
+     return bytes_read;
+ }
+
 int SendFileOverSocket(int socket_desc, char* file_name)
 {
 	struct stat	obj;
@@ -98,10 +126,27 @@ int SendFileOverSocket(int socket_desc, char* file_name)
 
 	stat(file_name, &obj);
 	file_desc = open(file_name, O_RDONLY);
+	 
 	file_size = obj.st_size;
-	send(socket_desc, &file_size, sizeof(int), 0);
-	sendfile(socket_desc, file_desc, NULL, file_size);
+	int bytes_read = 0;
 
+	char * BUFF = malloc(file_size + 1) ;
+	
+
+	readall(file_desc, BUFF, file_size);
+	
+	printf(" SIZE IS = %d\n",file_size);
+
+
+	send(socket_desc, &file_size, sizeof(int), 0);
+
+
+	printf(" SIZE OF BUFF IS = %lu\n",strlen(BUFF));
+	send(socket_desc, BUFF, file_size, MSG_WAITALL);
+
+	printf("Sent FILE of size = %d\n",file_size);
+
+	free(BUFF);
 	return 1;
 }
 
@@ -161,9 +206,16 @@ void performPUT(char *file_name,int socket_desc)
 		write(socket_desc, request_msg, strlen(request_msg));
 		t = recv(socket_desc, reply_msg, BUFSIZ, 0);
 		reply_msg[t]='\0';
+
+            struct stat	obj;
+	        stat(file_name, &obj);
+            file_size = obj.st_size;
 		if (strcmp(reply_msg, "OK") == 0)
 		{
 			// Everything is fine and send file
+        
+	
+            printf("[OK] Sending File... of size = %d \n" ,file_size);
 			SendFileOverSocket(socket_desc, file_name);
 		}
 		else if(strcmp(reply_msg, "FP") == 0)
@@ -177,6 +229,7 @@ void performPUT(char *file_name,int socket_desc)
 				printf("Overwriting %s\n",file_name );
 				strcpy(client_response, "Y");
 				write(socket_desc, client_response, strlen(client_response));
+                printf("Sending File... of size = %d \n" ,file_size);
 				SendFileOverSocket(socket_desc, file_name);
 			}
 			else
