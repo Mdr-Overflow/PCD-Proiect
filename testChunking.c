@@ -29,9 +29,8 @@ void* read_file(void* arg) {
     int id = args->id;
 
     int start = id * BUF_SIZE;
-    // int end = (id+1) * BUF_SIZE;
+ //   int end = (id+1) * BUF_SIZE;
     char* thread_buf = malloc(sizeof(char) * BUFSIZ);
-    
     
     fseek(fp, start, SEEK_SET);
     
@@ -97,11 +96,12 @@ int main(int argc, char *argv[]) {
     
     // get cores
     
-    FILE* fp = fopen(filename, "r");
+    FILE* fp = fopen(filename, "rb");
     if (!fp) {
         printf("Failed to open file\n");
         pthread_exit(NULL);
     }
+
 
 
     long num_cores = sysconf(_SC_NPROCESSORS_ONLN);
@@ -165,10 +165,23 @@ int main(int argc, char *argv[]) {
             pthread_join(threads[i], NULL);
         }
 
-        
+         FILE *output_file = fopen(filename, "wb");
+            if (output_file == NULL) {
+                perror("Failed to open output file");
+                exit(1);
+    }
         // Print the contents of th fclose(fp);e buffer
-        for (int i = 0 ; i< num_cores ; i++)
-        printf("%.*s\n", buf_len, buf[i]);
+        for (int i = 0 ; i< num_cores ; i++) {
+         size_t bytes_written = fwrite(buf[i], 1, buf_len, output_file);
+         printf("%.*s\n", buf_len, buf[i]);
+        if (bytes_written < buf_len) {
+            perror("Failed to write buffer to output file");
+            exit(1);
+        }
+       // fputc('\n', output_file); // Add a newline after each buffer
+    }
+    
+    fclose(output_file);
 
         
     }
@@ -178,5 +191,6 @@ int main(int argc, char *argv[]) {
     printf("Done.\n");
     free(buf);
     fclose(fp);
+   
     return 0;
 }
