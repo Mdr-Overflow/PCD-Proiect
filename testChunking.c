@@ -8,9 +8,10 @@
 
 
 #define BUF_SIZE 8000
+#define BITS_BUF_SIZE 64000
 #define BUF_NR_DEF 1
 
-char **buf = NULL; // Shared buffer
+unsigned char **buf = NULL; // Shared buffer
 int buf_len = 0; // Current length of buffer
 pthread_mutex_t buf_lock; // Mutex to lock the buffer
 
@@ -18,6 +19,36 @@ typedef struct threadArgs{
    FILE * fp;
    int id;
 }threadArgs_t;
+
+char *getBufferAsBinaryString(void *in, size_t bufferSize) {
+    int pos = 0;
+    char result;
+    char *bitstring = (char *)malloc(bufferSize * 8 + bufferSize); // Allocate enough space for the bitstring
+    
+    if (bitstring == NULL) {
+        return NULL; // Failed to allocate memory
+    }
+    
+    memset(bitstring, 0, bufferSize * 8 + bufferSize);
+    unsigned char *input = (unsigned char *)in;
+    
+    for (int i = bufferSize - 1; i >= 0; i--) {
+        for (int j = 7; j >= 0; j--) {
+            if ((input[i] >> j) & 1)
+                result = '1';
+            else
+                result = '0';
+            
+            bitstring[pos++] = result;
+            
+            if ((j > 0) && ((j) % 4) == 0) {
+                bitstring[pos++] = ' ';
+            }
+        }
+    }
+    
+    return bitstring;
+}
 
 // Thread function to read a portion of the file into the buffer
 void* read_file(void* arg) {
@@ -30,16 +61,18 @@ void* read_file(void* arg) {
 
     int start = id * BUF_SIZE;
  //   int end = (id+1) * BUF_SIZE;
-    char* thread_buf = malloc(sizeof(char) * BUFSIZ);
+    unsigned char* thread_buf = (unsigned char*)malloc(BUFSIZ);
     
     fseek(fp, start, SEEK_SET);
     
-    int bytes_read = fread(thread_buf, 1, BUF_SIZE, fp);
+    int bytes_read = fread_unlocked(thread_buf, 1, BUF_SIZE, fp);
    // printf("%s", thread_buf);
     
-    strcpy(buf[id],thread_buf);
+    // strcpy(buf[id],thread_buf);
+    memcpy(buf[id], getBufferAsBinaryString(thread_buf,BUF_SIZE), strlen((const char*)thread_buf) + 1);
     //printf("%s", thread_buf);
 
+    printf("\nTHREAD %i HAS =  %s\n",id,getBufferAsBinaryString(thread_buf,BUF_SIZE));
     
     pthread_mutex_lock(&buf_lock);
     buf_len += bytes_read;
@@ -115,6 +148,9 @@ int main(int argc, char *argv[]) {
     printf("Number of usefull threads: %ld\n", num_cores);
     // allocate mem for buff
 
+
+    // num_cores = 3;
+
     pthread_t threads[num_cores];
     int thread_ids[(int)num_cores]; // cringe
     
@@ -134,27 +170,28 @@ int main(int argc, char *argv[]) {
     
 
     
-    
 
 
     // re - init matrix
 
-    buf = (char **)malloc(num_cores * sizeof(int *));
+    buf = (unsigned char **)malloc(num_cores * sizeof(int *));
 
       for (i = 0; i < num_cores; i++) 
-        buf[i] = (char *)malloc(BUF_SIZE * sizeof(char));
+        buf[i] = (unsigned char *)malloc(BITS_BUF_SIZE * sizeof(unsigned char));
      
     
 
     // Initialize the mutex
     pthread_mutex_init(&buf_lock, NULL);
 
+    int round = 0;
     while (buf_len < st.st_size){
         
-     
+        
 
         // Create the threads
         for (i = 0; i < num_cores; i++) {
+            ARGS[i].id = i + round;
             pthread_create(&threads[i], NULL, read_file, (void *) &ARGS[i]);
         }
 
@@ -165,31 +202,37 @@ int main(int argc, char *argv[]) {
             pthread_join(threads[i], NULL);
         }
 
-         FILE *output_file = fopen(filename, "wb");
+        round +=num_cores;
+
+    }
+
+         FILE *output_file = fopen("output3.png", "wb");
             if (output_file == NULL) {
                 perror("Failed to open output file");
                 exit(1);
-    }
+                }
+    
         // Print the contents of th fclose(fp);e buffer
-        for (int i = 0 ; i< num_cores ; i++) {
-         size_t bytes_written = fwrite(buf[i], 1, buf_len, output_file);
-         printf("%.*s\n", buf_len, buf[i]);
-        if (bytes_written < buf_len) {
-            perror("Failed to write buffer to output file");
-            exit(1);
-        }
+        for (int i = 0 ; i< num_cores ; i++) { // should handle case were more then num_cores
+         size_t bytes_written = fwrite(buf[i], 1, strlen((const char*)buf[i]), output_file);
+         printf("chunk is = %s\n",buf[i]);
+        // if (bytes_written < buf_len) {
+        //     perror("Failed to write buffer to output file");
+        //     exit(1);
+        // }
        // fputc('\n', output_file); // Add a newline after each buffer
     }
     
     fclose(output_file);
 
         
-    }
+    
 
     // Destroy the mutex
     pthread_mutex_destroy(&buf_lock);
     printf("Done.\n");
     free(buf);
+
     fclose(fp);
    
     return 0;
