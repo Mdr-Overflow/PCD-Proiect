@@ -48,6 +48,20 @@ int main(int argc , char **argv)
 		return 1;
 	}
 
+	// ////////// FOARTE IMPORTANT ZICE SA LINGERUIE DACA NU SE TRANSMITE TOT !!!!!!!!!!!!!!
+	// ///
+	// //
+
+
+	// const struct linger linger_val = { 1, 600 };
+    // setsockopt(socket_desc, SOL_SOCKET, SO_LINGER, &linger_val, sizeof(linger_val));
+
+	int opt = 1;
+    if (setsockopt(socket_desc, SOL_SOCKET, SO_REUSEADDR | SO_REUSEPORT, &opt, sizeof(opt))) {
+        perror("setsockopt failed");
+        exit(EXIT_FAILURE);}
+
+
 	char SERVER_IP[BUFSIZ];
 	int SERVER_PORT;
 	strcpy(SERVER_IP,argv[1]);
@@ -112,9 +126,11 @@ ssize_t readall(int fd, char *buf, size_t bytes)
              else
                  return -1;
          }
-         if (n == 0)
-             return bytes_read;
-         bytes_read += n;
+         if (n == 0){
+             printf("\n!!!!!!!!!!!!! n = 0 !!!!!!!!!!!!!!\n");
+			 return bytes_read;
+		 }
+         bytes_read += strlen(buf);
      } while (bytes_read < bytes);
      return bytes_read;
  }
@@ -133,10 +149,11 @@ int SendFileOverSocket(int socket_desc, char* file_name)
 	char * BUFF = malloc(file_size + 1) ;
 	
 
-	readall(file_desc, BUFF, file_size);
+	int ree = readall(file_desc, BUFF, file_size);
 	
-	printf(" SIZE IS = %d\n",file_size);
+	printf(" SIZE IS = %d\n",ree);
 
+	printf(" BEFOR SEND SIZE OF BUFF IS = %lu\n",strlen(BUFF));
 
 	send(socket_desc, &file_size, sizeof(int), 0);
 
@@ -231,8 +248,10 @@ void performPUT(char *file_name,int socket_desc)
 				// User says yes to overwrite. Send Y and then data
 				printf("Overwriting %s\n",file_name );
 				strcpy(client_response, "Y");
+
 				write(socket_desc, client_response, strlen(client_response));
-                printf("Sending File... of size = %d \n" ,file_size);
+                
+				printf("Sending File... of size = %d \n" ,file_size);
 				SendFileOverSocket(socket_desc, file_name);
 			}
 			else

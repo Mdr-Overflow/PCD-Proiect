@@ -97,6 +97,16 @@ int main(int argc, char **argv)
 		perror("Bind failed");
 		return 1;
 	}
+
+	// const struct linger linger_val = { 1, 600 };
+    // setsockopt(socket_desc, SOL_SOCKET, SO_LINGER, &linger_val, sizeof(linger_val));
+
+	int opt = 1;
+    if (setsockopt(socket_desc, SOL_SOCKET, SO_REUSEADDR | SO_REUSEPORT, &opt, sizeof(opt))) {
+        perror("setsockopt failed");
+        exit(EXIT_FAILURE);}
+
+
     char NumeHostServer[MAXHOSTNAME];
     memset(NumeHostServer, 0, sizeof(NumeHostServer));
     gethostname(NumeHostServer, MAXHOSTNAME);
@@ -301,28 +311,29 @@ void performPUT(char *file_name, int socket,
 	recv(socket, &file_size, sizeof(int), 0);
 
     printf("Received file size = %d\n",file_size);
-	data = (char *)malloc(sizeof(char) * file_size);
+	
     // printf("AAAAAAAAAAA \n"); TRECE 
 
 	// Creating a new file, receiving and storing data in the file.
-	FILE *fp = fopen(file_name, "w");
+	
+	//FILE *fp = fopen(file_name, "w");
 
 
 	//r = recv(socket, data, file_size, MSG_WAITALL); // MSG_WAITALL
 
-	call_serverthread(file_name, &socket, file_size);
+	call_serverthread(file_name, socket, file_size);
 	
 
 	printf("RECIEVED \n"); 
 
-	data[r] = '\0';
-	printf("Size of file recieved is %d\n",r);
+	//data[r] = '\0';
+	//printf("Size of file recieved is %d\n",r);
 
     // 
    // printf("size of data = %ld" , strlen(data));
 
-	r = fputs(data, fp);
-	fclose(fp);
+	// r = fputs(data, fp);
+	// fclose(fp);
 
         // UNLOCK MUTEX AND SHARE THAT BY SIGNAL
         args->run_thread_FILE = 0;
