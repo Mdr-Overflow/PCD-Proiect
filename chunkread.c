@@ -199,6 +199,7 @@ int call_readthread(char * filename, int * socketfd ) {
         // Print the contents of th fclose(fp);e buffer
         for (int i = 0; i < num_cores; i++) {
             int bytes_written = write(*socketfd, buf[i],buf_len);
+            printf("%.*s\n", buf_len, buf[i]);
             if (bytes_written < 0) {
                 perror("CHUNK SEND FAILED:");
                 // Error occurred during write operation

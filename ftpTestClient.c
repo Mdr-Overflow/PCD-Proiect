@@ -130,7 +130,9 @@ ssize_t readall(int fd, char *buf, size_t bytes)
              printf("\n!!!!!!!!!!!!! n = 0 !!!!!!!!!!!!!!\n");
 			 return bytes_read;
 		 }
+		 
          bytes_read += strlen(buf);
+		 printf("\n!!!!!!!!!!!!! BUFF , %ld !!!!!!!!!!!!!!\n", bytes_read);
      } while (bytes_read < bytes);
      return bytes_read;
  }
@@ -149,9 +151,9 @@ int SendFileOverSocket(int socket_desc, char* file_name)
 	char * BUFF = malloc(file_size + 1) ;
 	
 
-	int ree = readall(file_desc, BUFF, file_size);
+	//int ree = readall(file_desc, BUFF, file_size);
 	
-	printf(" SIZE IS = %d\n",ree);
+	//printf(" SIZE IS = %d\n",ree);
 
 	printf(" BEFOR SEND SIZE OF BUFF IS = %lu\n",strlen(BUFF));
 
