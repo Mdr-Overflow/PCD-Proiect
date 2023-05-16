@@ -22,8 +22,19 @@
 
 #include <netdb.h>
 
+#include "socket_utils.h"
 #include "socketqueue.h"
+#include "socketqueue.c"
 #include "chunkread.h"
+#include "chunkread.c"
+
+#include "SockOp.h"
+
+#include "SockOp.c"
+
+#include "socket_utils.c"
+
+#include "socket_utils.h"
 
 
 
@@ -31,7 +42,7 @@
 #define MAXFILE 100
 #define FILENAME 100
 #define MAXHOSTNAME 256
-#define MAXCON 10 
+#define MAXCON 20
 
 
 
@@ -98,13 +109,13 @@ int main(int argc, char **argv)
 		return 1;
 	}
 
-	// const struct linger linger_val = { 1, 600 };
-    // setsockopt(socket_desc, SOL_SOCKET, SO_LINGER, &linger_val, sizeof(linger_val));
+	const struct linger linger_val = { 1, 600 };
+    setsockopt(socket_desc, SOL_SOCKET, SO_LINGER, &linger_val, sizeof(linger_val));
 
-	int opt = 1;
-    if (setsockopt(socket_desc, SOL_SOCKET, SO_REUSEADDR | SO_REUSEPORT, &opt, sizeof(opt))) {
-        perror("setsockopt failed");
-        exit(EXIT_FAILURE);}
+	// int opt = 1;
+    // if (setsockopt(socket_desc, SOL_SOCKET, SO_REUSEADDR | SO_REUSEPORT, &opt, sizeof(opt))) {
+    //     perror("setsockopt failed");
+    //     exit(EXIT_FAILURE);}
 
 
     char NumeHostServer[MAXHOSTNAME];
@@ -195,7 +206,7 @@ int GetCommandFromRequest(char* request)
 	while(request[i] != ' ' && request[i] != '\0')
 		i++;
 	if(request[i] == '\0')
-		return 6;
+		return 7;
 	else
 	{
 		strncpy(cmd, request, i-1);
@@ -212,8 +223,10 @@ int GetCommandFromRequest(char* request)
 		return 4;
 	else if(!strcmp(cmd, "SHOW"))
 		return 5;
-	else if(!strcmp(cmd, "EXIT"))
+	else if(!strcmp(cmd, "SELECT"))
 		return 6;
+	else if(!strcmp(cmd, "EXIT"))
+		return 7;
 	return 0;
 }
 
@@ -231,7 +244,18 @@ void performGET(char *file_name, int socket)
 		strcpy(server_response, "OK");
 		write(socket, server_response, strlen(server_response));
 		
-		//Send File
+
+		//   // Get the file size
+        // struct stat st;
+        // stat(file_name, &st);
+        // int file_size = st.st_size;
+
+        // // Send the file size
+        // sprintf(server_response, "%d", file_size);
+        // write(socket, server_response, strlen(server_response));
+
+
+		//Send File + SIZE
 		SendFileOverSocket(socket, file_name);
 	}
 	else
@@ -453,12 +477,13 @@ void *ConnectionHandler(void * ARGS)
 			case 4:
             	strcpy(file_ext, GetArgumentFromRequest(client_request));
                 performMPUT(socket,args);
-			
-				break;
-			case 5:
+			case 5 : 
 				// showFile(socket);
 				break;
 			case 6:
+				// selectFile();
+				break;
+			case 7:
 				//free(socket_desc);   
 				pthread_exit(NULL);
 		}
@@ -482,16 +507,23 @@ bool SendFileOverSocket(int socket_desc, char* file_name)
 	stat(file_name, &obj);
 
 	
-	file_size = obj.st_size;
-    // Open file
-	file_desc = open(file_name, O_RDONLY);
+	// file_size = obj.st_size;
+    // // Open file
+	// file_desc = open(file_name, O_RDONLY);
 
     // Send file size
 
-    printf("file size is = %d\n", file_size);             ////////////////////// WTF ??????????
-	write(socket_desc, &file_size, sizeof(int));
+    // printf("file size is = %d\n", file_size);             ////////////////////// WTF ??????????
+
+	
+	// write(socket_desc, &file_size, sizeof(int));
 	// Send File
-	sendfile(socket_desc, file_desc, NULL, file_size);
+
+	// sendfile(socket_desc, file_desc, NULL, file_size);
+	//	call_readthread(file_name, &socket_desc);
+	//send_image(socket_desc, file_name);
+	send_file(file_name, socket_desc);
+
 
 	printf("File %s sent\n",file_name);
 	return true;

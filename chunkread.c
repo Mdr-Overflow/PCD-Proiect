@@ -9,6 +9,9 @@
 #include <math.h>
 
 #include "chunkread.h"
+#include "chunkSock.h"
+#include "chunkSock.c"
+
 
 
 #define BUF_SIZE 8000
@@ -82,7 +85,7 @@ void* write_file(void* arg) {
     pthread_exit(NULL);
 }
 
-
+// THIS READS AND SENDS 
 int call_readthread(char * filename, int * socketfd ) {
 
     int i;
@@ -105,7 +108,7 @@ int call_readthread(char * filename, int * socketfd ) {
 
     if (st.st_size >= 8589934592 ) { // > 1 GB 
 
-        perror("Error: size too big , size must be smaller then 1GB");
+        perror("Error: size too big , size must be smaller or equal to  1GB");
     }
     else {
 
@@ -142,85 +145,72 @@ int call_readthread(char * filename, int * socketfd ) {
          num_cores = (int) (st.st_size/BUF_SIZE);
 
     printf("Number of usefull threads: %ld\n", num_cores);
-    // allocate mem for buff
-
-    pthread_t threads[num_cores];
-    int thread_ids[(int)num_cores]; // cringe
     
-    // make args  
-    threadArgs_t ARGS[num_cores];
-    ///
+printf("Number of useful threads: %ld\n", num_cores);
 
 
-    for (i= 0 ; i<num_cores ; i++){
-        ARGS[i].fp = fp;  // when copy char * to char * do not use strcpy , use it only if you want to copy to char **
-        ARGS[i].id = i;
-        ARGS[i].socketd = socketfd;
+
+
+
+    // Extract filename from path
+  char *shortfile = strrchr(filename, '/');
+  if (shortfile) {
+    shortfile++;  // Skip the '/'
+  } else {
+    shortfile = filename;
+  }
+
+  // Copy filename to another string for modification
+  char modifiedFilename[128];
+  strncpy(modifiedFilename, filename, sizeof(modifiedFilename) - 1);
+  modifiedFilename[sizeof(modifiedFilename) - 1] = '\0';  // Null-terminate the string
+
+  // Replace '.' with 'D'
+  for (int i = 0; modifiedFilename[i]; i++) {
+    if (modifiedFilename[i] == '.') {
+      modifiedFilename[i] = '@';
     }
-
-
-    // 
-
-    
-
-    
+  }
     
 
 
-    // re - init matrix
-
-    buf = (char **)malloc(num_cores * sizeof(int *));
-
-      for (i = 0; i < num_cores; i++) 
-        buf[i] = (char *)malloc(BUF_SIZE * sizeof(char));
-     
+    char dirName[256];
+    snprintf(dirName, sizeof(dirName), "ChunksTEMP_%s", modifiedFilename);
     
 
-    // Initialize the mutex
-    pthread_mutex_init(&buf_lock, NULL);
 
-    while (buf_len < st.st_size){
+    // Initialize the mutex and the condition variable
+    pthread_mutex_t mutex;
+    pthread_cond_t cond;
+    pthread_mutex_init(&mutex, NULL);
+    pthread_cond_init(&cond, NULL);
+
+    // Initialize the doneChunking flag to 0
+    int doneChunking = 0;
+
+    DoChunkingArgs doChunkingArgs = {filename, BUF_SIZE,
+     num_cores, &mutex, &cond, &doneChunking};
+    SendChunksArgs sendChunksArgs = {dirName, num_cores , 
+    socketfd, &mutex, &cond, &doneChunking};
+
+    pthread_t doChunkingThread, sendChunksThread;
+    
+    // Create the threads
+    pthread_create(&doChunkingThread, NULL, doChunkingSOCK, &doChunkingArgs);
+    pthread_create(&sendChunksThread, NULL, sendChunks, &sendChunksArgs);
         
-     
+        // IMIDIATE PROBLEM THREADS DON'T FINISH. WHY ?
 
-        // Create the threads
-        for (i = 0; i < num_cores; i++) {
-            pthread_create(&threads[i], NULL, read_file, (void *) &ARGS[i]);
-        }
+    // Wait for the threads to finish
+    pthread_join(doChunkingThread, NULL);
+    pthread_join(sendChunksThread, NULL);
 
+    // Destroy the mutex and the condition variable
+    pthread_mutex_destroy(&mutex);
+    pthread_cond_destroy(&cond);
 
-
-        // Wait for the threads to finish
-        for (i = 0; i < num_cores; i++) {
-            pthread_join(threads[i], NULL);
-        }
-
-         int bytes_written = 0;
-        // Print the contents of th fclose(fp);e buffer
-        for (int i = 0; i < num_cores; i++) {
-            int bytes_written = write(*socketfd, buf[i],buf_len);
-            printf("%.*s\n", buf_len, buf[i]);
-            if (bytes_written < 0) {
-                perror("CHUNK SEND FAILED:");
-                // Error occurred during write operation
-                char *error_msg = "ERROR";
-                int error_msg_len = strlen(error_msg);
-                int bytes_sent = write(*socketfd, error_msg, error_msg_len);
-                if (bytes_sent != error_msg_len) {
-                    // Error occurred during sending error message
-                    fprintf(stderr, "Failed to send error message\n");
-    }
-}
-        }
-
-        
-    }
-
-    // Destroy the mutex
-    pthread_mutex_destroy(&buf_lock);
     printf("Done.\n");
-    free(buf);
-    fclose(fp);
+
     return 0;
 }
 

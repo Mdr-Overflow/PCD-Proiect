@@ -3,8 +3,8 @@
 extern "C" {
 #endif
 
-#ifndef FILE_READER_H
-#define FILE_READER_H
+#ifndef CHUNKREAD_H
+#define CHUNKREAD_H
 
 #include <stdio.h>
 #include <stdlib.h>
