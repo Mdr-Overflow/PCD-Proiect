@@ -69,7 +69,7 @@ void* read_file(void* arg) {
    // printf("%s", thread_buf);
     
     // strcpy(buf[id],thread_buf);
-    memcpy(buf[id], getBufferAsBinaryString(thread_buf,BUF_SIZE), strlen((const char*)thread_buf) + 1);
+    memcpy(buf[id], getBufferAsBinaryString(thread_buf, BITS_BUF_SIZE), strlen((const char*)thread_buf) + 1);
     //printf("%s", thread_buf);
 
     printf("\nTHREAD %i HAS =  %s\n",id,getBufferAsBinaryString(thread_buf,BUF_SIZE));
