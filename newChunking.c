@@ -145,8 +145,18 @@ int main(int argc, char **argv) {
 //     }
 //     printf("\n\n");
 //   }
-  for ( int i = 0 ; i< numChunks ; i++)
-    writeChunkToFile("output11.png", threadData[i].buffer, CHUNK_SIZE);
+    // while (fileSize != 0) {
+
+    // if (fileSize >= CHUNK_SIZE){  
+    writeChunkToFile("output11", buffer, fileSize);
+    // fileSize -= CHUNK_SIZE;
+    // }
+    // else {
+    // writeChunkToFile("output11.png", buffer, fileSize);
+    // }
+
+    // }
+    
   free(buffer);
   fclose(file);
   return 0;
