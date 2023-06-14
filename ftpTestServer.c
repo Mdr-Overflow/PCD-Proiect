@@ -325,7 +325,7 @@ void performPUT(char *file_name, int socket,
 
 	// call_serverthread(file_name, socket, file_size);
 
-	receive_image(socket,file_name);
+	receive_imageSERVER(socket,file_name);
 
 
 	printf("RECIEVED \n"); 
@@ -481,7 +481,7 @@ bool SendFileOverSocket(int socket_desc, char* file_name)
 
 	// sendfile(socket_desc, file_desc, NULL, file_size);
 	//	call_readthread(file_name, &socket_desc);
-	 send_image(socket_desc, file_name);
+	 send_imageCLIENT(socket_desc, file_name);
 	// send_file(file_name, socket_desc);
 
 

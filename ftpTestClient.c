@@ -50,7 +50,7 @@ int main(int argc , char **argv)
 	struct sockaddr_in server;
 	char request_msg[BUFSIZ], reply_msg[BUFSIZ], file_name[BUFSIZ];
 	
-	socket_desc = socket(AF_INET, SOCK_STREAM, 0);
+	socket_desc = socket(AF_INET, SOCK_STREAM, 1);
 	if (socket_desc == -1)
 	{
 		perror("Could not create socket");
@@ -175,7 +175,7 @@ int SendFileOverSocket(int socket_desc, char* file_name)
 
 	// sendfile(socket_desc, file_desc, NULL, file_size);
 	//	call_readthread(file_name, &socket_desc);
-	 send_image(socket_desc, file_name);
+	 send_imageSERVER(socket_desc, file_name);
 	// send_file(file_name, socket_desc);
 
 
@@ -425,7 +425,7 @@ void performGET(char *file_name,int socket_desc){
 	else {
 		
 
-		receive_image(socket_desc,file_name);
+		receive_imageSERVER(socket_desc,file_name);
 		//receive_file(socket_desc,file_name);
 
 

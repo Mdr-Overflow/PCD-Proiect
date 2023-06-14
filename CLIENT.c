@@ -13,6 +13,9 @@
 #include <string.h>
 #include <errno.h>
 
+#include <netinet/tcp.h>  
+
+
 #define MAXFILE 100
 #define FILENAME 100
 #define MAXLINE 1024
@@ -57,7 +60,7 @@ int performAUTH(int socket_desc) {
     char Uname[MAXLINE];
     char password[MAXLINE];
       int sockfd, n;
-  char recvline[MAXLINE + 1];
+  char recvline[MAXLINE];
   struct sockaddr_in serv_addr;
   struct hostent * he;
 
@@ -129,15 +132,74 @@ int performAUTH(int socket_desc) {
     }
 
     // Citirea raspunsului de la server
-    if ((n = read(socket_desc, recvline, MAXLINE)) < 0) {
-      perror("EROARE client: nu pot sa citesc raspunsul de la server");
-      close(socket_desc);
-      exit(1);
+    // if ((n = read(socket_desc, recvline, MAXLINE)) < 0) {
+    //   perror("EROARE client: nu pot sa citesc raspunsul de la server");
+    //   close(socket_desc);
+    //   exit(1);
+    // }
+
+// Citirea raspunsului de la server ( WAIT FOR 5 SECONDS)
+   struct timeval timeout;
+fd_set read_fds;
+int fdmax = sockfd; // Assuming sockfd is your socket file descriptor
+
+    while(1) {
+    // Set up the file descriptor set.
+    FD_ZERO(&read_fds);
+    FD_SET(sockfd, &read_fds);
+
+    // Set up the timeout. 5 seconds, 0 microseconds.
+    timeout.tv_sec = 2;
+    timeout.tv_usec = 0;
+
+    // Now call select. sockfd+1 is used because select checks up to fdmax-1.
+    int retval = select(fdmax + 1, &read_fds, NULL, NULL, &timeout);
+    
+    if(retval == -1) {
+        perror("select");
+        // return;
+    } else if(retval == 0) {
+        // Timeout, do something, like resend the data or handle lost connection
+        printf("Timeout reached, no data received.\n");
+        continue; // If you want to retry
+        // Or handle as per your application logic
     }
+
+    // If we get here, there's data ready to be read on at least one descriptor
+    if(FD_ISSET(sockfd, &read_fds)) {
+    // ready to read
+    char buffer[1024];
+    memset(buffer, 0, sizeof(buffer));  // clear the buffer
+
+    int bytes_received = recv(sockfd, buffer, sizeof(buffer)-1, 0);
+    if(bytes_received < 0) {
+        // handle error
+        perror("Error reading from socket");
+        continue;
+    } else if(bytes_received == 0) {
+        // handle disconnect
+        printf("Server closed connection\n");
+        break;
+    } else {
+        // data received successfully
+        printf("Received: %s\n", buffer);
+    }
+}
+}
+    // else {
+    //     printf("RET IS = %d",retval);
+        
+       
+    // }
+   
+
+    printf("RECIVED :: %s",recvline);
 
     recvline[n] = '\0'; // adaugam terminatorul de sir
 
     printf("::: %s :::", recvline);
+     // clear recvline buffer
+    memset(recvline, 0, sizeof(recvline));
 
     // !!!!!!!!!! DACA serverul se inchide neasteptat va trimite "exit" catre client
     // clientul receptioneaza exit si se va inchide si el
@@ -196,11 +258,14 @@ int main(int argc , char **argv)
 		timeout.tv_sec = 0;
 		timeout.tv_usec = 100;
 
-		if (setsockopt(socket_desc, SOL_SOCKET, SO_RCVTIMEO, (char *)&timeout, sizeof(timeout)) < 0) {
-			perror("setsockopt");
-		
-		}
+		int flag = 1;
+        int result = setsockopt(socket_desc, IPPROTO_TCP, TCP_NODELAY, (char *) &flag, sizeof(int));
 
+        if (result < 0) {
+            // Handle error here
+            perror("Setting TCP_NODELAY error");
+            // return -1;
+        }
 				
 		int flags = fcntl(socket_desc, F_GETFL, 0);
 		if (flags == -1) {
@@ -421,7 +486,7 @@ void performGET(char *file_name,int socket_desc){
 					int index_received = -1;
 					char index_buffer[BUFSIZ];
 
-
+                    
 					
 
 					// Receive the index from the server

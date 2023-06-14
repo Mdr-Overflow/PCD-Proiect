@@ -17,6 +17,8 @@
 #include <sys/types.h>
 #include <signal.h>
 
+#include <netinet/tcp.h>  // TCP_NODELAY is here
+
 
 #include <sys/socket.h>
 
@@ -60,7 +62,7 @@ int run_thread_FILE; //= 0;
 pthread_mutex_t run_lock_FILE ;//= PTHREAD_MUTEX_INITIALIZER;
 pthread_cond_t run_cond_FILE ;//= PTHREAD_COND_INITIALIZER;
 char * filename;
-int * socket_d;
+int socket_d;
 char * Uname;
 
 }FTPthreadArgs_t;
@@ -102,8 +104,8 @@ void sigtstpHandler(int sig)
 #define MAXLINE 512 /* nr. max. octeti de citit cu recv() */
 
 #define MAXUNAME 30
-#define LOGINMESSAGE "[0] Login Required !"
-#define REQUIREMESAGGE "[0] To sign in write 1 , to create a new account write 0 !" 
+//#define LOGINMESSAGE "[0] Login Required !"
+// #define REQUIREMESAGGE "[0] To sign in write 1 , to create a new account write 0 !" 
 #define USERNAMEMESSAGE "[0] Username: "
 #define PASSMESSAGE "[0] Password: "
 #define unameCreateMESSAGE "[0] Type in a desired Username: "
@@ -452,6 +454,42 @@ void PostUsername(char * Uname){
 
 }
 
+void MakeLog(char * Uname, char * Protocol, char * OperationType, char * FileName) {
+    sqlite3 *db;
+    int rc = sqlite3_open("pcdProiect.db", &db);
+    if (rc != SQLITE_OK) {
+        fprintf(stderr, "Cannot open database: %s\n", sqlite3_errmsg(db));
+        sqlite3_close(db);
+        exit(1);
+    }
+    
+    char *sql = "INSERT INTO Logs (Protocol, TimeStamp, OperationType, OperationDuration, UserName, FileName) \
+    VALUES (?, datetime('now'), ?, ?, ?, ?)";
+    
+    sqlite3_stmt *stmt;
+    rc = sqlite3_prepare_v2(db, sql, -1, &stmt, NULL);
+    if (rc != SQLITE_OK) {
+        fprintf(stderr, "Error preparing statement: %s\n", sqlite3_errmsg(db));
+        sqlite3_close(db);
+        exit(1);
+    }
+    
+    rc = sqlite3_bind_text(stmt, 1, Protocol, -1, SQLITE_TRANSIENT);
+    rc = sqlite3_bind_text(stmt, 3, OperationType, -1, SQLITE_TRANSIENT);
+    rc = sqlite3_bind_int(stmt, 4, rand() % 100); // Random operation duration, modify this as needed
+    rc = sqlite3_bind_text(stmt, 5, Uname, -1, SQLITE_TRANSIENT);
+    rc = sqlite3_bind_text(stmt, 6, FileName, -1, SQLITE_TRANSIENT);
+    
+    rc = sqlite3_step(stmt);
+    if (rc != SQLITE_DONE) {
+        fprintf(stderr, "Error inserting data: %s\n", sqlite3_errmsg(db));
+        sqlite3_close(db);
+        exit(1);
+    }
+    sqlite3_finalize(stmt);
+    sqlite3_close(db);
+}
+
 
 void PostPass(char * Pass, char * Uname){
 
@@ -525,7 +563,7 @@ client * performAUTH(int sockfd, int clientType )
 {
 
 
-
+  
     
   signal(SIGINT, sigintHandler);
   signal(SIGTSTP, sigtstpHandler);
@@ -577,14 +615,43 @@ client * performAUTH(int sockfd, int clientType )
                 // AICI UNDEVA
 
                 if (authstate == 0){
+    char * LOGINMESSAGE = "[0] Login Required !";
+    char * REQUIREMESAGGE = "[0] To sign in write 1 , to create a new account write 0 !";
 
-                printf("::: Sending Login Request to client...  \n");
-                send(newsockfd, LOGINMESSAGE, strlen(LOGINMESSAGE), 0);
-                send(newsockfd, REQUIREMESAGGE, strlen(REQUIREMESAGGE), 0);                    
-                authstate = 1;
-                memset(line, 0, sizeof(line));  // resetez bufferul pt. linia receptionata
-                continue; // receptionam urm. mesaj de la client
-                }
+    printf("::: Sending Login Request to client...  \n");
+    
+    // Send LOGINMESSAGE
+    int totalSent = 0;
+    int len = strlen(LOGINMESSAGE);
+    while (totalSent < len) {
+        int bytesSent = send(newsockfd, LOGINMESSAGE + totalSent, len - totalSent, 0);
+        if (bytesSent == -1) {
+            // Handle error
+            perror("Error sending data");
+            break;
+        }
+        totalSent += bytesSent;
+    }
+
+    // Send REQUIREMESAGGE
+    totalSent = 0;
+    len = strlen(REQUIREMESAGGE);
+    while (totalSent < len) {
+        int bytesSent = send(newsockfd, REQUIREMESAGGE + totalSent, len - totalSent, 0);
+        if (bytesSent == -1) {
+            // Handle error
+            perror("Error sending data");
+            break;
+        }
+        totalSent += bytesSent;
+    }
+
+    printf("::: Sent Login Request to client...  \n");   
+
+    authstate = 1;
+    memset(line, 0, sizeof(line));  // reset the buffer for the received line
+    continue; // receive the next message from the client
+}
 
         if (authstate == 1){    
 
@@ -723,19 +790,22 @@ client * performAUTH(int sockfd, int clientType )
         if ( strcmp(role, "ADMIN") == 0 && clientType == 0)
         {
            newClient->isAdmin = 1; // Set isAdmin for ADMIN
-           // pass it      
+           // pass it 
+           MakeLog(Uname,"FTP","performAUTH","NONE");
            return newClient;
         }
         else if ( strcmp(role, "USER") == 0 && clientType == 1 )
         {
             newClient->isAdmin = 0; // Set isAdmin for USER
             // pass it   
+            MakeLog(Uname,"FTP","performAUTH","NONE");
              return newClient;
         }
         else if ( strcmp(role, "APIUSER") == 0 && clientType == 2)
         {
             newClient->isAdmin = 0; // Set isAdmin for APIUSER
-            // pass it   
+            // pass it
+            MakeLog(Uname,"FTP","performAUTH","NONE");
              return newClient;
         }
         else 
@@ -797,7 +867,50 @@ int GetCommandFromRequest(char* request)
 }
 
 
-void performGET(char *file_name, int socket)
+void performSHOW(int socket,char * Uname) {
+    printf("Performing SHOW request\n");
+    DIR *d;
+    char *p1, *p2;
+    struct dirent *dir;
+    d = opendir(".");
+    char full_name[BUFSIZ];
+
+    if (d) {
+        while ((dir = readdir(d)) != NULL) {
+            strcpy(full_name, dir->d_name);
+            p1 = strtok(dir->d_name, ".");
+            p2 = strtok(NULL, ".");
+            if(p2 != NULL && 
+              (strcmp(p2, "png") == 0 || strcmp(p2, "jpg") == 0 || strcmp(p2, "bmp") == 0 || strcmp(p2, "tiff") == 0 || strcmp(p2, "jpeg") == 0)) {
+                // Write the file name to the socket
+                write(socket, full_name, strlen(full_name) + 1); 
+            }
+        }
+        closedir(d);
+        // Send "END" message to indicate the end of the list
+        write(socket, "END", 4);
+        MakeLog(Uname,"FTP","performSHOW","NONE");
+    }
+}
+
+void performSELECT(int socket,char * Uname) {
+    printf("Performing SELECT request\n");
+    performSHOW(socket,Uname); // Call performSHOW first to send the file list
+
+    char file_name[BUFSIZ], reply[BUFSIZ];
+
+    // Receive file name from client
+    int r = recv(socket, file_name, BUFSIZ, 0);
+    file_name[r] = '\0';
+
+
+     MakeLog(Uname,"FTP","performSELECT",file_name);
+    // Perform  GET OP LISTS for the selected file
+   // GET_OP_LIST(file_name);
+}
+
+
+void performGET(char *file_name, int socket, char * Uname)
 {
 	char server_response[BUFSIZ];
 	printf("Performing GET request of client\n");
@@ -813,6 +926,7 @@ void performGET(char *file_name, int socket)
 
 		//Send File + SIZE
 		SendFileOverSocket(socket, file_name);
+         MakeLog(Uname,"FTP","performGET",file_name);
 	}
 	else
 	{
@@ -826,7 +940,7 @@ void performGET(char *file_name, int socket)
 }
 
 void performPUT(char *file_name, int socket, 
- FTPthreadArgs_t *args )
+ FTPthreadArgs_t *args, char * Uname)
 {
 	int c,r;
 
@@ -902,9 +1016,10 @@ void performPUT(char *file_name, int socket,
         args->filename = "NaN";
            for (int i = 0 ; i< MAXCON ; i++)
                  pthread_cond_signal(&(ThreadARGS[i]->run_cond_FILE));
-        
+
+    MakeLog(Uname,"FTP","performPUT",file_name);    
 }
-void performMGET(int socket,char* file_ext){
+void performMGET(int socket,char* file_ext, char * Uname){
 
 	printf("Performing MGET request of client\n");
 	DIR *d;
@@ -928,7 +1043,7 @@ void performMGET(int socket,char* file_ext){
 					write(socket, full_name, strlen(full_name));
      				int t = recv(socket, reply, 2, 0);
      				if(!strcmp(reply,"OK"))
-						performGET(full_name,socket);
+						performGET(full_name,socket,Uname);
             }
         }
         closedir(d);
@@ -937,9 +1052,10 @@ void performMGET(int socket,char* file_ext){
         strcpy(server_response,"END");
         write(socket, server_response, strlen(server_response));
     }
+    MakeLog(Uname,"FTP","performMGET","MULTIPLE");  
 }
 
-void performMPUT(int server_socket, FTPthreadArgs_t * args) {
+void performMPUT(int server_socket, FTPthreadArgs_t * args, char * Uname) {
     printf("Performing MPUT\n");
 
     char ext[BUFSIZ], request_msg[BUFSIZ];
@@ -965,7 +1081,7 @@ void performMPUT(int server_socket, FTPthreadArgs_t * args) {
             p1 = strtok(dir->d_name, ".");
             p2 = strtok(NULL, ".");
             if (p2 != NULL && strcmp(p2, ext) == 0)
-                performPUT(full_name, server_socket,args);
+                performPUT(full_name, server_socket,args,Uname);
         }
         closedir(d);
     }
@@ -980,9 +1096,9 @@ void *ConnectionHandler(void * ARGS)
 
     
     // socket
-    int  socket_desc = *(args->socket_d);
+    int  socket_desc = (args->socket_d);
 
-
+    char * Uname = (args->Uname);   
     // mutex and cond
  
 
@@ -991,6 +1107,7 @@ void *ConnectionHandler(void * ARGS)
 
 	char reply[BUFSIZ], file_ext[BUFSIZ],server_response[BUFSIZ], client_request[BUFSIZ], file_name[BUFSIZ];
 	char *data;
+    MakeLog(Uname,"FTP","CONNECTED","NONE");  
 	while(1)
 	{	printf("\nWaiting for command\n");
 		int l = recv(socket, client_request, BUFSIZ, 0);
@@ -1001,24 +1118,24 @@ void *ConnectionHandler(void * ARGS)
 		{
 			case 1:
 				strcpy(file_name, GetArgumentFromRequest(client_request));
-				performGET(file_name, socket);
+				performGET(file_name, socket,Uname);
 				break;
 			case 2:
 				strcpy(file_name, GetArgumentFromRequest(client_request));
-				performPUT(file_name, socket, args);
+				performPUT(file_name, socket, args,Uname);
 				break;
 			case 3:
 				strcpy(file_ext, GetArgumentFromRequest(client_request));
-				performMGET(socket,file_ext);
+				performMGET(socket,file_ext,Uname);
 				break;
 			case 4:
             	strcpy(file_ext, GetArgumentFromRequest(client_request));
-                performMPUT(socket,args);
+                performMPUT(socket,args,Uname);
 			case 5 : 
-				// showFile(socket);
+				performSHOW(socket, Uname);
 				break;
 			case 6:
-				// selectFile();
+				performSELECT(socket, Uname);
 				break;
 			case 7:
 				//free(socket_desc);   
@@ -1073,7 +1190,7 @@ void *inet_main (void *args) {
     // DO AUTH ()
 
 
-	int socket_desc, socket_client, *new_sock, 
+	int socket_desc, socket_client, new_sock, 
 	c = sizeof(struct sockaddr_in);
 
 	struct  sockaddr_in	server, client;
@@ -1089,6 +1206,19 @@ void *inet_main (void *args) {
 	server.sin_family = AF_INET;
 	server.sin_addr.s_addr = INADDR_ANY;
 	server.sin_port = htons(SERVER_PORT);
+
+    struct timeval timeout;
+		timeout.tv_sec = 2;
+		timeout.tv_usec = 0;
+
+		int flag = 1;
+        int result = setsockopt(socket_desc, IPPROTO_TCP, TCP_NODELAY, (char *) &flag, sizeof(int));
+
+        if (result < 0) {
+            // Handle error here
+            perror("Setting TCP_NODELAY error");
+            // return -1;
+        }
 
 	if (bind(socket_desc, (struct sockaddr *)&server, sizeof(server)) < 0)
 	{
@@ -1130,14 +1260,13 @@ void *inet_main (void *args) {
 
     
     
-	while (socket_client = accept(socket_desc, (struct sockaddr *)&client, (socklen_t*)&c))
+	while ((socket_client = accept(socket_desc, (struct sockaddr *)&client, (socklen_t*)&c)))
 	{
 
        
 
 		pthread_t sniffer_thread;
-		new_sock = malloc(1);
-		*new_sock = socket_client;
+		new_sock = socket_client;
 		printf("socket is %d",socket_client);
 
         if (con < 10){
@@ -1163,7 +1292,7 @@ void *inet_main (void *args) {
         ThreadARGS[con] = ARG;
 
          // PERFORM AUTH FOR "USER" : 1
-         struct client* client = performAUTH(socket_client, 1);
+         struct client* client = performAUTH(new_sock, 1);
           if ( client != NULL) {
         
                 ARG->Uname = client->username;   
@@ -1227,26 +1356,6 @@ int main () {
 
     SetupDataBase();
 
-//     // CHECK IF IT WHNT PAST AUTH
-//     int authstate = 0;
-//     char * Uname = malloc(sizeof(char) * MAXUNAME); 
-//     int stage = 0;
-
-
-
-//     client* newClient = malloc(sizeof(client));  // Allocate memory for the new client
-//     newClient->username = malloc(20 * sizeof(char));  // Allocate memory for the username string
-//     strcpy(newClient->username, "Alice");  // Copy the string into the username field
-//     newClient->isAdmin = 1;  // Set the isAdmin field
-//     newClient->socket_descriptor = sockfd;  // Assign the socket descriptor
-
-
-//   // AUTH ZONE 
-//     if(pthread_create(&auth_thread, NULL, auth_thread_handler, (void*) &newsockfd) < 0)
-//     {
-//         perror("Could not create thread");
-//         // return 1;
-//     }
 
 
   
