@@ -528,7 +528,7 @@ void performGET(char *file_name,int socket_desc){
 				FD_ZERO(&read_fds); // clear the set
 				FD_SET(socket_desc, &read_fds); // add our socket to the set
 
-				// Set the timeout as desired
+		
 				timeout.tv_sec = 5;  // 5 seconds timeout
 				timeout.tv_usec = 0;
 

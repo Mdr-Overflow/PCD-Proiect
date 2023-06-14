@@ -568,7 +568,7 @@ client * performAUTH(int sockfd, int clientType )
   signal(SIGINT, sigintHandler);
   signal(SIGTSTP, sigtstpHandler);
 
-  int rc, clilen, newsockfd, childpid;
+  int rc, clilen, childpid;
   char line[512];
   char echo_buffer[520] = "echo ";
   struct sockaddr_in cli_addr, serv_addr;
@@ -624,7 +624,7 @@ client * performAUTH(int sockfd, int clientType )
     int totalSent = 0;
     int len = strlen(LOGINMESSAGE);
     while (totalSent < len) {
-        int bytesSent = send(newsockfd, LOGINMESSAGE + totalSent, len - totalSent, 0);
+        int bytesSent = send(sockfd, LOGINMESSAGE + totalSent, len - totalSent, 0);
         if (bytesSent == -1) {
             // Handle error
             perror("Error sending data");
@@ -637,7 +637,7 @@ client * performAUTH(int sockfd, int clientType )
     totalSent = 0;
     len = strlen(REQUIREMESAGGE);
     while (totalSent < len) {
-        int bytesSent = send(newsockfd, REQUIREMESAGGE + totalSent, len - totalSent, 0);
+        int bytesSent = send(sockfd, REQUIREMESAGGE + totalSent, len - totalSent, 0);
         if (bytesSent == -1) {
             // Handle error
             perror("Error sending data");
@@ -657,7 +657,7 @@ client * performAUTH(int sockfd, int clientType )
 
                 if(strstr(line, "1")){
                 
-                send(newsockfd, USERNAMEMESSAGE, strlen(USERNAMEMESSAGE), 0);
+                send(sockfd, USERNAMEMESSAGE, strlen(USERNAMEMESSAGE), 0);
                 printf("::: Sending UserName request to client...  \n");
               
                 authstate = 11;
@@ -668,7 +668,7 @@ client * performAUTH(int sockfd, int clientType )
                                     
                 else if (strstr(line, "0")){
 
-                send(newsockfd, unameCreateMESSAGE, strlen(unameCreateMESSAGE), 0);
+                send(sockfd, unameCreateMESSAGE, strlen(unameCreateMESSAGE), 0);
                 printf("::: Sending UserNameCreate request to client...  \n");
                 authstate = 10;
                 memset(line, 0, sizeof(line));  // resetez bufferul pt. linia receptionata
@@ -685,7 +685,7 @@ client * performAUTH(int sockfd, int clientType )
                     if ( isAuthUNAME(getpid(),line))
                     {
 
-                        send(newsockfd, PASSMESSAGE, strlen(PASSMESSAGE), 0);
+                        send(sockfd, PASSMESSAGE, strlen(PASSMESSAGE), 0);
                         printf("::: Sending Pass request to client...  \n");
                         authstate = 111;
                         printf("%s",line);
@@ -695,7 +695,7 @@ client * performAUTH(int sockfd, int clientType )
                     }
                     else {
 
-                        send(newsockfd, UnameWRONGMessage, strlen(UnameWRONGMessage), 0);
+                        send(sockfd, UnameWRONGMessage, strlen(UnameWRONGMessage), 0);
                         printf("::: Sending uname not found request to client...  \n");
                         authstate = 11;
                         memset(line, 0, sizeof(line));  // resetez bufferul pt. linia receptionata
@@ -709,7 +709,7 @@ client * performAUTH(int sockfd, int clientType )
                     if ( isAuthPASS(getpid(),Uname,line) == true)
                     {
 
-                        send(newsockfd, "Login Successful", strlen("Login Successful"), 0);
+                        send(sockfd, "Login Successful", strlen("Login Successful"), 0);
                         printf("::: Sending Login Successful to client...  \n");
                         authstate = 999;
                         memset(line, 0, sizeof(line));  // resetez bufferul pt. linia receptionata
@@ -717,7 +717,7 @@ client * performAUTH(int sockfd, int clientType )
                     }
                     else {
 
-                        send(newsockfd, PassWRONGMessage, strlen(PassWRONGMessage), 0);
+                        send(sockfd, PassWRONGMessage, strlen(PassWRONGMessage), 0);
                         printf("::: Sending uname not found request to client...  \n");
                         authstate = 111;
                         memset(line, 0, sizeof(line));  // resetez bufferul pt. linia receptionata
@@ -734,7 +734,7 @@ client * performAUTH(int sockfd, int clientType )
                     if ( createUNAME(getpid(),line))
                     {
 
-                        send(newsockfd, PASSMESSAGE, strlen(PASSMESSAGE), 0);
+                        send(sockfd, PASSMESSAGE, strlen(PASSMESSAGE), 0);
                         printf("::: Sending Pass request to client...  \n");
                         authstate = 101;
                         strcpy(Uname,line);
@@ -743,7 +743,7 @@ client * performAUTH(int sockfd, int clientType )
                     }
                     else {
 
-                        send(newsockfd, UnameWRONGMessage, strlen(UnameWRONGMessage), 0);
+                        send(sockfd, UnameWRONGMessage, strlen(UnameWRONGMessage), 0);
                         printf("::: Sending uname illegal request to client...  \n");
                         authstate = 10;
                         memset(line, 0, sizeof(line));  // resetez bufferul pt. linia receptionata
@@ -757,7 +757,7 @@ client * performAUTH(int sockfd, int clientType )
                     if ( createPASS(getpid(),Uname,line) == true)
                     {
 
-                        send(newsockfd, "Login Successful", strlen("Login Successful"), 0);
+                        send(sockfd, "Login Successful", strlen("Login Successful"), 0);
                         printf("::: Sending LogON Successful to client...  \n");
                         authstate = 999;
                         memset(line, 0, sizeof(line));  // resetez bufferul pt. linia receptionata
@@ -765,7 +765,7 @@ client * performAUTH(int sockfd, int clientType )
                     }
                     else {
 
-                        send(newsockfd, PassWRONGMessage, strlen(PassWRONGMessage), 0);
+                        send(sockfd, PassWRONGMessage, strlen(PassWRONGMessage), 0);
                         printf("::: Sending Password illegal to client...  \n");
                         authstate = 101;
                         memset(line, 0, sizeof(line));  // resetez bufferul pt. linia receptionata
@@ -1292,7 +1292,7 @@ void *inet_main (void *args) {
         ThreadARGS[con] = ARG;
 
          // PERFORM AUTH FOR "USER" : 1
-         struct client* client = performAUTH(new_sock, 1);
+         struct client* client = performAUTH(socket_client, 1);
           if ( client != NULL) {
         
                 ARG->Uname = client->username;   
