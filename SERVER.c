@@ -1,3 +1,4 @@
+#include <limits.h>
 #include <stdio.h>
 #include <string.h>
 #include <sys/socket.h>
@@ -60,6 +61,7 @@ pthread_mutex_t run_lock_FILE ;//= PTHREAD_MUTEX_INITIALIZER;
 pthread_cond_t run_cond_FILE ;//= PTHREAD_COND_INITIALIZER;
 char * filename;
 int * socket_d;
+char * Uname;
 
 }FTPthreadArgs_t;
 
@@ -159,8 +161,11 @@ CREATE TABLE IF NOT EXISTS Logs (\
 );";
 
 
-
-
+typedef struct client {
+    char *username;
+    int isAdmin;
+    int socket_descriptor;
+} client;
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 // monitorizam daca userul inchide brusc serverul folosind ctrl + c sau alte semnale 
@@ -516,13 +521,11 @@ bool createPASS(pid_t uname , char * ClientUserName, char * Pass){
 
 // 0 - ADMIN , 1 - USER , 2 - API USER 
 
-int performAUTH(int sockfd, int clientType )
+client * performAUTH(int sockfd, int clientType )
 {
 
 
 
-
- 
     
   signal(SIGINT, sigintHandler);
   signal(SIGTSTP, sigtstpHandler);
@@ -549,6 +552,7 @@ int performAUTH(int sockfd, int clientType )
 
         // TO DO ON CLIENT PERFORM AUTH MSSG. SEND
 
+       printf("Performing AUTH ");
        while ((rc = recv(sockfd, & line, MAXLINE, 0)) )  
 
         {
@@ -569,6 +573,8 @@ int performAUTH(int sockfd, int clientType )
 
                 // 10 send create uname req
                 // 11 send create pass req
+
+                // AICI UNDEVA
 
                 if (authstate == 0){
 
@@ -710,34 +716,43 @@ int performAUTH(int sockfd, int clientType )
         if (authstate == 999){
             
            char *role = CheckRole(Uname);
-    if (role != NULL) {
+            if (role != NULL) {
+        client *newClient = malloc(sizeof(client)); // Allocate memory for client
+        newClient->username = strdup(Uname); // Copy username
+        newClient->socket_descriptor = clientType; // Assign socket_descriptor
         if ( strcmp(role, "ADMIN") == 0 && clientType == 0)
         {
-           // create client object and pass it      
+           newClient->isAdmin = 1; // Set isAdmin for ADMIN
+           // pass it      
+           return newClient;
         }
         else if ( strcmp(role, "USER") == 0 && clientType == 1 )
         {
-            // create client object and pass it   
+            newClient->isAdmin = 0; // Set isAdmin for USER
+            // pass it   
+             return newClient;
         }
         else if ( strcmp(role, "APIUSER") == 0 && clientType == 2)
         {
-            // create client object and pass it   
+            newClient->isAdmin = 0; // Set isAdmin for APIUSER
+            // pass it   
+             return newClient;
         }
         else 
         {
+            free(newClient); // Deallocate memory
             // HANDLE ERROR
         }
-        free(role); // Don't forget to free the memory!
+        free(role); 
     } else {
         // HANDLE ERROR
-    }
-        }
+    }        }
 
 
 
     free(Uname);
 
-    return 0;
+    return NULL;
 
     } // end isAuth()
       }
@@ -1111,9 +1126,15 @@ void *inet_main (void *args) {
     }
 
     printf("---TCPServer %d: ++++ astept conexiune clienti pe PORT: %d++++\n\n", INETPORT, SERVER_PORT);
+
+
+    
     
 	while (socket_client = accept(socket_desc, (struct sockaddr *)&client, (socklen_t*)&c))
 	{
+
+       
+
 		pthread_t sniffer_thread;
 		new_sock = malloc(1);
 		*new_sock = socket_client;
@@ -1140,6 +1161,17 @@ void *inet_main (void *args) {
 
 
         ThreadARGS[con] = ARG;
+
+         // PERFORM AUTH FOR "USER" : 1
+         struct client* client = performAUTH(socket_client, 1);
+          if ( client != NULL) {
+        
+                ARG->Uname = client->username;   
+          }  
+          else {
+            continue;
+            //AND MESSAGE TO CLIENT
+          }
 
 		pthread_create(&sniffer_thread, NULL, ConnectionHandler, (void*) ARG);
 		
@@ -1177,13 +1209,6 @@ void *soap_main (void *args) {
   return NULL;
 }
 
-
-
-typedef struct client {
-    char *username;
-    int isAdmin;
-    int socket_descriptor;
-} client;
 
 
 
