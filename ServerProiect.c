@@ -1,33 +1,4 @@
 
-/**
- * Madaras Andrei - Iulian
- * IA3 2023, subgrupa 3
- * Tema 5 (nr temei)
- * 
- * Acest program face asta (creaza un server ce utilizeaza socketuri INET peste TCP) ::
- * 
- * Specificatii aplicatii server (1)
-
-Server-ul va procesa, la fiecare pas, mesajul transmis, si va raspunde inapoi clientului astfel:
-daca se primeste “time” => serverul va raspunde clientului cu timpul local de pe sistem
-daca se primeste “user” => serverul va raspunde clientului cu numele utilizatorului curent
-altfel, se primeste un mesaj “msg” => serverul raspunde “echo :: msg” (unde msg e un mesaj oarecare)
-
-Conexiunea trebuie mentinuta, pana cand server-ul se opreste, sau pana cand clientul inchide conexiunea. 
-
- * 
- * 
- * 
- *
- * Am tratat urm. situatii limita care pot aparea in cazul programului:
-    -Inchiderea brusca a serverului prin semnal de la user sau sistem
-    -Inchiderea brusca a clientului prin semnal de la user sau sistem
-    -Receprionarea eronata de caractere
-    -Erori ce pot aparea in procesul preluarii celor 2 comenzi (time si user) de catre socketul serverului
- */
-
-
-
 
 #include <stdio.h>
 
@@ -225,16 +196,6 @@ void SetupDataBase(){
     //free(sql);
                         }
 
-
- void InsertIntoUserTable( void * User){
-
-
-
-
-
-
-
- }
 
 
 void getUserInfo(char * username, char * pass) {
@@ -581,7 +542,6 @@ int main(int argc, char * argv[]) {
 
     /*
 
-    if(illegalCheck(pass)){ Send("FUCK YOU"); Continue; }
 
     */
 

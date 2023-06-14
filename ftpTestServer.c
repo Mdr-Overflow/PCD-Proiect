@@ -245,16 +245,6 @@ void performGET(char *file_name, int socket)
 		write(socket, server_response, strlen(server_response));
 		
 
-		//   // Get the file size
-        // struct stat st;
-        // stat(file_name, &st);
-        // int file_size = st.st_size;
-
-        // // Send the file size
-        // sprintf(server_response, "%d", file_size);
-        // write(socket, server_response, strlen(server_response));
-
-
 		//Send File + SIZE
 		SendFileOverSocket(socket, file_name);
 	}
@@ -278,6 +268,8 @@ void performPUT(char *file_name, int socket,
     // int * run_thread_FILE -> args.run_thread_FILE;
     // pthread_mutex_t * run_lock_FILE = args.run_lock_FILE;
     // pthread_cond_t * run_cond_FILE = args.run_cond_FILE;
+
+
     args->filename = file_name;
 
 
@@ -312,7 +304,7 @@ void performPUT(char *file_name, int socket,
    // Lock the mutex before accessing the file
     // check if file is accessed by any of the possible threads
      // Send a message to the client until it's done
-     // DURERE DE CAP MASIVA !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+ 
           pthread_mutex_lock(&(args->run_lock_FILE));
           printf("BIG PROBLEM");
           for (int i = 0 ; i< MAXCON ; i++) {
@@ -329,35 +321,14 @@ void performPUT(char *file_name, int socket,
 	// Getting File 
 	
 
-	int file_size;
-	char *data;
-	// Recieving file size and allocating memory
-	recv(socket, &file_size, sizeof(int), 0);
-
-    printf("Received file size = %d\n",file_size);
-	
-    // printf("AAAAAAAAAAA \n"); TRECE 
-
-	// Creating a new file, receiving and storing data in the file.
-	
-	//FILE *fp = fopen(file_name, "w");
 
 
-	//r = recv(socket, data, file_size, MSG_WAITALL); // MSG_WAITALL
+	// call_serverthread(file_name, socket, file_size);
 
-	call_serverthread(file_name, socket, file_size);
-	
+	receive_image(socket,file_name);
+
 
 	printf("RECIEVED \n"); 
-
-	//data[r] = '\0';
-	//printf("Size of file recieved is %d\n",r);
-
-    // 
-   // printf("size of data = %ld" , strlen(data));
-
-	// r = fputs(data, fp);
-	// fclose(fp);
 
         // UNLOCK MUTEX AND SHARE THAT BY SIGNAL
         args->run_thread_FILE = 0;
@@ -506,23 +477,12 @@ bool SendFileOverSocket(int socket_desc, char* file_name)
 	printf("Sending File...\n");
 	stat(file_name, &obj);
 
-	
-	// file_size = obj.st_size;
-    // // Open file
-	// file_desc = open(file_name, O_RDONLY);
 
-    // Send file size
-
-    // printf("file size is = %d\n", file_size);             ////////////////////// WTF ??????????
-
-	
-	// write(socket_desc, &file_size, sizeof(int));
-	// Send File
 
 	// sendfile(socket_desc, file_desc, NULL, file_size);
 	//	call_readthread(file_name, &socket_desc);
-	//send_image(socket_desc, file_name);
-	send_file(file_name, socket_desc);
+	 send_image(socket_desc, file_name);
+	// send_file(file_name, socket_desc);
 
 
 	printf("File %s sent\n",file_name);

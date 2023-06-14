@@ -166,36 +166,21 @@ ssize_t readall(int fd, char *buf, size_t bytes)
 
 int SendFileOverSocket(int socket_desc, char* file_name)
 {
-	struct stat	obj;
 	int file_desc, file_size;
 
-	stat(file_name, &obj);
-	file_desc = open(file_name, O_RDONLY);
-	 
-	file_size = obj.st_size;
-	int bytes_read = 0;
-
-	char * BUFF = malloc(file_size + 1) ;
-	
-
-	//int ree = readall(file_desc, BUFF, file_size);
-	
-	//printf(" SIZE IS = %d\n",ree);
-
-	printf(" BEFOR SEND SIZE OF BUFF IS = %lu\n",strlen(BUFF));
-
-	send(socket_desc, &file_size, sizeof(int), 0);
+	printf("Sending File...\n");
+	// stat(file_name, &obj);
 
 
-	printf(" SIZE OF BUFF IS = %lu\n",strlen(BUFF));
+
+	// sendfile(socket_desc, file_desc, NULL, file_size);
+	//	call_readthread(file_name, &socket_desc);
+	 send_image(socket_desc, file_name);
+	// send_file(file_name, socket_desc);
 
 
-	call_readthread(file_name, &socket_desc);
+	printf("File %s sent\n",file_name);
 
-
-	printf("Sent FILE of size = %d\n",file_size);
-
-	free(BUFF);
 	return 1;
 }
 
@@ -440,8 +425,8 @@ void performGET(char *file_name,int socket_desc){
 	else {
 		
 
-		//receive_image(socket_desc,file_name);
-		receive_file(socket_desc,file_name);
+		receive_image(socket_desc,file_name);
+		//receive_file(socket_desc,file_name);
 
 
 
