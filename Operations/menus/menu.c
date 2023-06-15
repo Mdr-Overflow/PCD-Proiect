@@ -26,9 +26,9 @@
 #include "png_stats.h"
 
 
-//gcc menu.c bmp2jpeg.c bmp2png.c jpeg2bmp.c jpeg2png.c png2bmp.c png2jpeg.c bmp_tint.c jpeg_blurr.c jpeg_grayscale.c jpeg_tint.c png_blurr.c png_grayscale.c png_tint.c -o menu -ljpeg -lpng && ./menu dog.png
 
 
+//gcc menu.c bmp2jpeg.c bmp2png.c jpeg2bmp.c jpeg2png.c png2bmp.c png2jpeg.c bmp_tint.c jpeg_blurr.c jpeg_grayscale.c jpeg_tint.c png_blurr.c png_grayscale.c png_tint.c bmp_stats.c png_stats.c jpeg_stats.c -o menu -ljpeg -lpng && ./menu dog.png
 
 
 // CONVERSIONS
@@ -45,6 +45,7 @@ void* applyBMP2JPEG (void *filename) {
     printf("bmp2jpeg conversion applied successfully.\n");
     pthread_exit(NULL);
 }
+
 
 //2
 void* applyBMP2PNG (void *filename) {

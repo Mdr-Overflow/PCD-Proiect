@@ -84,8 +84,16 @@ void performSHOW(int socket) {
 
     printf("End of SHOW\n");
 }
-void performSELECT(int socket) {
+void performSELECT(int socket, char *file_name) {
     printf("Requesting file selection\n");
+
+
+	char request_msg[BUFSIZ], reply_msg[BUFSIZ] , filename_received[BUFSIZ];
+	int file_size;
+	char *data;
+	int ignore = 0;
+	int t;
+	int mode = 1;
 
     // performSHOW(socket); // Call performSHOW first to get the file list
 
@@ -97,17 +105,45 @@ void performSELECT(int socket) {
     // // Send file name to the server
     // write(socket, file_name, strlen(file_name) + 1);
 
-	
+
+
+    if( access( file_name, F_OK ) != -1 )
+	{
+		int abortflag = 0;
+		printf("File found on server. Press 1 to GET. Press any other key to abort.\n");
+		scanf("%d", &abortflag);
+		if(abortflag!=1)
+			return;
+	}
+	else
+	{
+		printf("File doesn't exist at server.ABORTING.\n");
+	}
+	// Get a file from server
+	strcpy(request_msg, "GET ");
+	strcat(request_msg, file_name);
+	write(socket, request_msg, strlen(request_msg));
+	recv(socket, reply_msg, 2, 0);
+	reply_msg[2] = '\0';
+	printf("%s\n", reply_msg);
+	if (strcmp(reply_msg, "OK") == 0)
+	{
+	 char cmd[512];
+    snprintf(cmd, sizeof(cmd), "cd .. && cp %s Operations/menus/%s", file_name,file_name);
+	system(cmd);
+    snprintf(cmd, sizeof(cmd), "cd .. && cd Operations && cd menus gcc menu.c bmp2jpeg.c bmp2png.c jpeg2bmp.c jpeg2png.c png2bmp.c png2jpeg.c bmp_tint.c jpeg_blurr.c jpeg_grayscale.c jpeg_tint.c png_blurr.c png_grayscale.c png_tint.c bmp_stats.c png_stats.c jpeg_stats.c -o menu -ljpeg -lpng && ./menu %s", file_name);
+    system(cmd);
+		
+	}
+
+
+
 
 	// DO THE OPERATIONS MAGIC
 	
-    char cmd[512];
-
-    snprintf(cmd, sizeof(cmd), "cd .. && cd Operations && gcc menu.c bmp2jpeg.c bmp2png.c jpeg2bmp.c jpeg2png.c png2bmp.c png2jpeg.c bmp_tint.c jpeg_blurr.c jpeg_grayscale.c jpeg_tint.c png_blurr.c png_grayscale.c png_tint.c bmp_stats.c png_stats.c jpeg_stats.c -o menu -ljpeg -lpng && ./menu %s", file_name);
-    system(cmd);
+   
     
 }
-
 
 
 int receive_image(int client_socket, const char *file_name) {
@@ -443,7 +479,9 @@ int main(int argc , char **argv)
                 performSHOW(socket_desc);
                 break;
             case 6:
-                performSELECT(socket_desc);
+			    printf("Enter file_name to use for operations: ");
+                scanf("%s", file_name);
+                performSELECT(socket_desc,file_name);
                 break;
             case 7:
                 strcpy(request_msg,"EXIT");

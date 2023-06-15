@@ -1,0 +1,2 @@
+Resolution: 612x408
+Dominant Color: R=143, G=145, B=130
