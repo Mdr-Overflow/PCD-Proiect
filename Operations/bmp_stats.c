@@ -114,8 +114,9 @@ void extractBMPStats(const char* filename) {
     }
 
     // Hardcoded output file name
-    const char* outputFilename = "bmp_stats.txt";
-
+       char outputFilename[512];
+    sprintf(outputFilename, "OP_out/%s_bmp_stats.txt", filename);
+    
     // Write stats to output file
     FILE* outputFile = fopen(outputFilename, "w");
     if (!outputFile) {

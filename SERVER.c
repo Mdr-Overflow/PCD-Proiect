@@ -45,6 +45,7 @@
 
 #include "socket_utils.h"
 
+#include <sys/un.h>
 
 
 #define CMD_SIZE 100
@@ -70,6 +71,27 @@ char * Uname;
 
 FTPthreadArgs_t ** ThreadARGS;
 
+
+typedef struct UNIXFTPthreadArgs{
+
+int run_thread_FILE; //= 0;
+pthread_mutex_t run_lock_FILE ;//= PTHREAD_MUTEX_INITIALIZER;
+pthread_cond_t run_cond_FILE ;//= PTHREAD_COND_INITIALIZER;
+char * filename;
+int socket_d;
+char * Uname;
+
+}UNIXFTPthreadArgs_t;
+
+
+UNIXFTPthreadArgs_t ** UNIXThreadARGS;
+
+
+
+
+
+
+
 void *ConnectionHandler(void *socket_desc);
 char* GetArgumentFromRequest(char* request);
 bool SendFileOverSocket(int socket_desc, char* file_name);
@@ -87,7 +109,7 @@ void sigtstpHandler(int sig)
 }
 
 
-#define UNIXSOCKET "/tmp/unixds"
+#define UNIXSOCKET "/tmp/server_socket"
 #define INETPORT   18081
 #define SOAPPORT   18082
 
@@ -1235,6 +1257,80 @@ void *ConnectionHandler(void * ARGS)
 	pthread_exit(NULL);
 }
 
+
+
+void performCREATE_USERS(int socket, char * Uname)
+{
+    // Here, write the code to create users in the database.
+    // You may need to send/receive more data from the client.
+}
+
+void performGET_DATA(int socket, char * Uname)
+{
+    // Here,  write the code to retrieve all data from the database,
+    // create a JSON file, and dump all data into this file.
+    // You may need to send/receive more data from the client.
+}
+
+void *ConnectionHandlerADMIN(void * ARGS)
+{
+    FTPthreadArgs_t *args = (FTPthreadArgs_t *)ARGS;
+    int  socket_desc = (args->socket_d);
+    char * Uname = (args->Uname);
+
+    int choice;
+    int socket = socket_desc;
+
+    char client_request[BUFSIZ], file_name[BUFSIZ];
+    MakeLog(Uname,"FTP","CONNECTED","NONE");  
+    while(1)
+    {   
+        printf("\nWaiting for command\n");
+        int l = recv(socket, client_request, BUFSIZ, 0);
+        client_request[l]='\0';
+        printf("Command Received %s\n",client_request );
+        choice = GetCommandFromRequest(client_request);
+        switch(choice)
+        {
+            case 1:
+                strcpy(file_name, GetArgumentFromRequest(client_request));
+                performGET(file_name, socket, Uname);
+                break;
+            case 2:
+                strcpy(file_name, GetArgumentFromRequest(client_request));
+                performPUT(file_name, socket, args, Uname);
+                break;
+            case 3:
+                performMGET(socket, GetArgumentFromRequest(client_request), Uname);
+                break;
+            case 4:
+                performMPUT(socket, args, Uname);
+                break;
+            case 5 : 
+                performSHOW(socket, Uname);
+                break;
+            case 6:
+                performSELECT(socket, Uname);
+                break;
+            case 7: // EXIT
+                pthread_exit(NULL);
+            case 8: // CREATE_USERS
+                performCREATE_USERS(socket, Uname);
+                break;
+            case 9: // GET_DATA
+                performGET_DATA(socket, Uname);
+                break;
+            default:
+                printf("Invalid command\n");
+                break;
+        }
+    }
+    pthread_exit(NULL);
+}
+
+
+
+
 char* GetArgumentFromRequest(char* request)
 {
 	char *arg = strchr(request, ' ');
@@ -1421,7 +1517,116 @@ void *inet_main (void *args) {
 
 // Thread functions
 void *unix_main (void *args) {
-  return NULL;
+   // other code...
+
+    signal(SIGINT, sigintHandler);
+    signal(SIGTSTP, sigtstpHandler);
+
+    struct sockaddr_un server, client;
+    int socket_client, new_sock;
+    // Create socket
+    int  socket_desc = socket(AF_UNIX, SOCK_STREAM, 0);
+    if (socket_desc == -1)
+    {
+        perror("Could not create socket");
+        // EXIT
+    }
+
+    memset(&server, 0, sizeof(server));
+    server.sun_family = AF_UNIX;
+    strncpy(server.sun_path, "/tmp/server_socket", sizeof(server.sun_path) - 1);
+
+
+
+    if (bind(socket_desc, (struct sockaddr *)&server, sizeof(server)) < 0)
+    {
+        perror("Bind failed");
+        // EXIT
+    }
+
+
+
+    if (listen(socket_desc, 1) < 0)                  // ONLY ONE ADMIN 
+    {
+        perror("Listen failed");
+        // return 1;
+    }
+
+ 
+    
+ 
+
+  
+    if (socket_client < 0)
+    {
+        perror("Accept failed");
+        // return 1;
+    }
+
+
+    printf("---TCPServer %S: @@@@ ADMIN LOGGED ON @@@@\n\n", UNIXSOCKET);
+
+
+    
+    int con = 0;
+	   socklen_t client_len = sizeof(struct sockaddr_un);
+    while ((socket_client = accept(socket_desc, (struct sockaddr *)&client, &client_len)))
+    {
+      
+       con++;
+       if ( con > 1) break;
+
+		pthread_t sniffer_thread;
+		new_sock = socket_client;
+		printf("socket is %d",socket_client);
+
+      
+
+        int run_thread_FILE = 0 ;
+        pthread_mutex_t run_lock_FILE = PTHREAD_MUTEX_INITIALIZER;
+        pthread_cond_t run_cond_FILE = PTHREAD_COND_INITIALIZER;
+        char * filename = (char *)malloc(FILENAME);
+
+        UNIXFTPthreadArgs_t  *ARG = (UNIXFTPthreadArgs_t *) malloc(sizeof(UNIXFTPthreadArgs_t));
+        ARG->filename = filename;
+        ARG->run_cond_FILE = run_cond_FILE;
+        ARG->run_lock_FILE = run_lock_FILE;
+        ARG->run_thread_FILE = 0;
+        ARG->socket_d = new_sock;
+
+
+        ThreadARGS[con] = ARG;
+
+    
+        ARG->Uname = "ADMIN";
+
+
+		pthread_create(&sniffer_thread, NULL, ConnectionHandler, (void*) ARG);
+		
+	}
+
+	//pthread_join(sniffer_thread, NULL);
+	 
+	if (socket_client<0)
+	{
+		perror("Accept failed");
+		// return 1;
+	}
+
+    
+    free(UNIXThreadARGS);
+
+    for (int i = 0 ; i< MAXCON ; i++)
+     free(UNIXThreadARGS[i]);
+
+
+
+
+
+    return NULL;
+
+
+
 }
 
 

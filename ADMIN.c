@@ -87,17 +87,15 @@ void performSHOW(int socket) {
 void performSELECT(int socket) {
     printf("Requesting file selection\n");
 
-    // performSHOW(socket); // Call performSHOW first to get the file list
+    performSHOW(socket); // Call performSHOW first to get the file list
 
-    // char file_name[BUFSIZ];
+    char file_name[BUFSIZ];
 
-    // printf("Enter the name of the file you want to select:\n");
-    // scanf("%s", file_name);
+    printf("Enter the name of the file you want to select:\n");
+    scanf("%s", file_name);
 
-    // // Send file name to the server
-    // write(socket, file_name, strlen(file_name) + 1);
-
-	
+    // Send file name to the server
+    write(socket, file_name, strlen(file_name) + 1);
 
 	// DO THE OPERATIONS MAGIC
 	
@@ -328,71 +326,28 @@ int fdmax = sockfd; // Assuming sockfd is your socket file descriptor
 
     }
 
-
-
 int main(int argc , char **argv)
 {
-
-    // CHANGE STUFF HERE 
-
-
-	if(argc!=3){
+	if(argc!=2){
 		printf("Invalid arguments\n");
 		return 0;
 	}
+
 	int socket_desc;
-	struct sockaddr_in server;
+	struct sockaddr_un server;
 	char request_msg[BUFSIZ], reply_msg[BUFSIZ], file_name[BUFSIZ];
-	
-	socket_desc = socket(AF_INET, SOCK_STREAM, 0);
+
+	socket_desc = socket(AF_UNIX, SOCK_STREAM, 0);
 	if (socket_desc == -1)
 	{
 		perror("Could not create socket");
 		return 1;
 	}
 
-	// ////////// FOARTE IMPORTANT ZICE SA LINGERUIE DACA NU SE TRANSMITE TOT !!!!!!!!!!!!!!
-	// ///
-	// //
-
-
-	// const struct linger linger_val = { 1, 600 };
-    // setsockopt(socket_desc, SOL_SOCKET, SO_LINGER, &linger_val, sizeof(linger_val));
-
-		// struct timeval timeout;
-		// timeout.tv_sec = 0;
-		// timeout.tv_usec = 100;
-
-		// int flag = 1;
-        // int result = setsockopt(socket_desc, IPPROTO_TCP, TCP_NODELAY, (char *) &flag, sizeof(int));
-
-        // if (result < 0) {
-        //     // Handle error here
-        //     perror("Setting TCP_NODELAY error");
-        //     // return -1;
-        // }
-				
-		// int flags = fcntl(socket_desc, F_GETFL, 0);
-		// if (flags == -1) {
-		// 	perror("fcntl F_GETFL");
-
-		// }
-
-		// // Clear the non-blocking flag
-		// flags &= ~O_NONBLOCK;
-		// if (fcntl(socket_desc, F_SETFL, flags) == -1) {
-		// 	perror("fcntl F_SETFL");
-		
-		// }
-
-
-	char SERVER_IP[BUFSIZ];
-	int SERVER_PORT;
-	strcpy(SERVER_IP,argv[1]);
-	SERVER_PORT=atoi(argv[2]);
-	server.sin_addr.s_addr = inet_addr(SERVER_IP);
-	server.sin_family = AF_INET;
-	server.sin_port = htons(SERVER_PORT);
+	char SERVER_PATH[BUFSIZ];
+	strcpy(SERVER_PATH,argv[1]);
+	server.sun_family = AF_UNIX;
+	strncpy(server.sun_path, SERVER_PATH, sizeof(server.sun_path)-1);
 
 	// Connect to server
 	if (connect(socket_desc, (struct sockaddr *)&server, sizeof(server)) < 0)
@@ -400,23 +355,7 @@ int main(int argc , char **argv)
 		perror("Connection failed");
 		return 1;
 	}
-
-    // AFTER CONNECTING -> PERFORM AUTH FROM CLIENT SIDE 
-    //
-    //
-    //     if(!performAUTH(socket_desc)) {
-    //     printf("Auth failed\n");
-    //     return 1;
-    // }
-														// /////
-
-    ///
-    ///
-
-    ///
-    //
-
-	  int choice = 0;
+  int choice = 0;
     while(1)
     {
         printf("Enter a choice:\n1- GET\n2- PUT\n3- MGET\n4- MPUT\n5- SHOW\n6- SELECT\n7- EXIT\n");
