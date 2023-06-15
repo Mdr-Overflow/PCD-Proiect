@@ -14,13 +14,13 @@
  * @param socket The file descriptor for the socket connection.
  * @return 1 if the image is successfully received and saved, -1 otherwise.
  */
-int receive_image(int socket, char * filename);
+void receive_image2(int socket, char * file_name);
 
 /**
  * Read an image from disk and send it over a socket connection.
  *
  * @param socket The file descriptor for the socket connection.
  */
-int send_image(int socket, char * filename);
+void send_image2(int socket, char * file_name);
 
 #endif /* SOCKOP_H*/

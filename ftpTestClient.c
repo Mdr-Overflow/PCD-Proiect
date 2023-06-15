@@ -38,6 +38,7 @@ void performMGET(int server_socket);
 void performMPUT(int server_socket);
 
 
+
 int main(int argc , char **argv)
 {
 
@@ -50,7 +51,7 @@ int main(int argc , char **argv)
 	struct sockaddr_in server;
 	char request_msg[BUFSIZ], reply_msg[BUFSIZ], file_name[BUFSIZ];
 	
-	socket_desc = socket(AF_INET, SOCK_STREAM, 1);
+	socket_desc = socket(AF_INET, SOCK_STREAM, 0);
 	if (socket_desc == -1)
 	{
 		perror("Could not create socket");
@@ -175,7 +176,7 @@ int SendFileOverSocket(int socket_desc, char* file_name)
 
 	// sendfile(socket_desc, file_desc, NULL, file_size);
 	//	call_readthread(file_name, &socket_desc);
-	 send_imageSERVER(socket_desc, file_name);
+	// send_imageSERVER(socket_desc, file_name);
 	// send_file(file_name, socket_desc);
 
 
@@ -198,7 +199,7 @@ void performGET(char *file_name,int socket_desc){
 	int t;
 	int mode = 1;
 
-	if (mode == 0){
+	
 	if( access( file_name, F_OK ) != -1 )
 	{
 		int abortflag = 0;
@@ -216,6 +217,8 @@ void performGET(char *file_name,int socket_desc){
 	printf("%s\n", reply_msg);
 	if (strcmp(reply_msg, "OK") == 0)
 	{	
+
+	if (mode == 0){
 				//EXTRACT EXTENSION
 
 			char * extension = get_extension(file_name);
@@ -416,22 +419,22 @@ void performGET(char *file_name,int socket_desc){
 		printf("Done receiving data\n");
 
 
-	}
-	else
-	{
-		printf("File doesn't exist at server.ABORTING.\n");
-	}
+	
+	// else
+	// {
+	// 	printf("File doesn't exist at server.ABORTING.\n");
+	// }
 	}
 	else {
 		
 
-		receive_imageSERVER(socket_desc,file_name);
+		receive_image(socket_desc,file_name);
 		//receive_file(socket_desc,file_name);
 
 
 
 	}
-
+	}
 
 }
 

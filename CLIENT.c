@@ -43,6 +43,8 @@
 
 #include "socket_utils.h"
 
+#define MAX_BUFFER_SIZE 10240
+
 
 
 void performGET(char *file_name,int socket_desc);
@@ -50,6 +52,143 @@ void performPUT(char *file_name,int socket_desc);
 int SendFileOverSocket(int socket_desc, char* file_name);
 void performMGET(int server_socket);
 void performMPUT(int server_socket);
+
+
+void performSHOW(int socket) {
+    printf("Performing SHOW request\n");
+    char buffer[BUFSIZ];
+    int bytes_received;
+
+   	int count = 0;
+    while (1) {
+
+		printf("INSIDE SHOW WHILE ...\n");
+
+        memset(buffer, 0, sizeof(buffer)); 
+        bytes_received = recv(socket, buffer, BUFSIZ-1, 0); 
+
+        if(bytes_received <= 0){
+            // Handle error
+            perror("Failed to receive data from server");
+           	continue;
+        }
+
+
+        if(strcmp(buffer, "END") == 0)
+            break;
+
+        printf("[%d]: %s\n", count,buffer);
+		count++;
+    }
+
+    printf("End of SHOW\n");
+}
+void performSELECT(int socket) {
+    printf("Requesting file selection\n");
+
+    performSHOW(socket); // Call performSHOW first to get the file list
+
+    char file_name[BUFSIZ];
+
+    printf("Enter the name of the file you want to select:\n");
+    scanf("%s", file_name);
+
+    // Send file name to the server
+    write(socket, file_name, strlen(file_name) + 1);
+
+	// DO THE OPERATIONS MAGIC
+	
+
+}
+
+
+
+int receive_image(int client_socket, const char *file_name) {
+
+	printf("RECV. IMAGE \n");
+ FILE *image_file = fopen(file_name, "wb");
+    if (image_file == NULL) {
+        perror("Failed to open image file");
+        return -1;
+    }
+	printf("OPENED IMAGE \n");
+    char *buffer = (char *)malloc(MAX_BUFFER_SIZE);
+    if (buffer == NULL) {
+        perror("Failed to allocate buffer");
+        fclose(image_file);
+        return -1;
+    }
+	printf("ALLOCATED BUFFER \n");
+	
+    int bytes_received;
+    int total_received = 0;
+	
+
+	  struct timeval timeout = {2, 0};
+    if (setsockopt(client_socket, SOL_SOCKET, SO_RCVTIMEO, (char*)&timeout, sizeof(timeout)) < 0) {
+        perror("Error on setting the socket options");
+        exit(EXIT_FAILURE);
+    }
+
+	printf("RECV. IMAGE AND WRT. TO FILE");
+    // Receive image data from server and write to file
+    while ((bytes_received = recv(client_socket, buffer, MAX_BUFFER_SIZE, 0)) > 0) {
+        fwrite(buffer, 1, bytes_received, image_file);
+        total_received += bytes_received;
+    }
+
+	  if (bytes_received < 0) {
+        // Timeout occurred
+        if (errno == EWOULDBLOCK || errno == EAGAIN) {
+            // printf("recv() timed out.\n");
+        }
+        else {
+            // perror("recv() failed");
+            // exit(EXIT_FAILURE);
+        }
+    }
+
+    printf("Total received: %d bytes\n", total_received);
+
+    free(buffer);
+    fclose(image_file);
+    return 0;
+
+
+}
+
+int send_image(int client_socket, const char *file_name) {
+    FILE *image_file = fopen(file_name, "rb");
+    if (image_file == NULL) {
+        perror("Failed to open image file");
+        return -1;
+    }
+
+    char *buffer = (char *)malloc(MAX_BUFFER_SIZE);
+    if (buffer == NULL) {
+        perror("Failed to allocate buffer");
+        fclose(image_file);
+        return -1;
+    }
+
+    size_t bytes_read;
+
+    // Read image data from file and send to server
+    while ((bytes_read = fread(buffer, 1, MAX_BUFFER_SIZE, image_file)) > 0) {
+        if (send(client_socket, buffer, bytes_read, 0) < 0) {
+            perror("Send failed");
+            free(buffer);
+            fclose(image_file);
+            return -1;
+        }
+    }
+
+    free(buffer);
+    fclose(image_file);
+    return 0;
+}
+
+
 
 
 int performAUTH(int socket_desc) {
@@ -69,48 +208,7 @@ int performAUTH(int socket_desc) {
     while(1) {
 
             printf("Conectat la server de authentificare. Introduceti mesaje (\"exit\" pentru a inchide):\n");
-        //     // SEND CONSOLE INPUT FROM USER
-        // fgets(input, MAXLINE, stdin); // get input from the user
-        // write(socket_desc, input, strlen(input)); // send it to the server
-        // memset(input, 0, sizeof(input)); // reset the input buffer
-
-        // // match server response
-        // if(strncmp(server_reply, LOGINMESSAGE, strlen(LOGINMESSAGE)) == 0) {
-        //     // Inform user login is required
-        //     printf("%s\n", server_reply + strlen(LOGINMESSAGE));
-        //     // Send back reply to the server
-        //     strcpy(client_reply, "Login acknowledged.");
-        //     write(socket_desc, client_reply, strlen(client_reply));
-        // } else if(strncmp(server_reply, REQUIREMESAGGE, strlen(REQUIREMESAGGE)) == 0) {
-        //     char choice[2];
-        //     printf("%s\n", server_reply + strlen(REQUIREMESAGGE));
-        //     scanf("%s", choice);
-        //     write(socket_desc, choice, strlen(choice));
-        // } else if(strncmp(server_reply, USERNAMEMESSAGE, strlen(USERNAMEMESSAGE)) == 0
-        //           || strncmp(server_reply, unameCreateMESSAGE, strlen(unameCreateMESSAGE)) == 0) {
-        //     printf("%s\n", server_reply + strlen(USERNAMEMESSAGE));
-        //     scanf("%s", client_reply); // Directly read input into client_reply
-        //     write(socket_desc, client_reply, strlen(client_reply));
-        // } else if(strncmp(server_reply, PASSMESSAGE, strlen(PASSMESSAGE)) == 0
-        //           || strncmp(server_reply, passCreateMESSAGE, strlen(passCreateMESSAGE)) == 0) {
-        //     printf("%s\n", server_reply + strlen(PASSMESSAGE));
-        //     scanf("%s", client_reply); // Directly read input into client_reply
-        //     write(socket_desc, client_reply, strlen(client_reply));
-        // } else if(strncmp(server_reply, "Login Successful", strlen("Login Successful")) == 0) {
-        //     return 1; // AUTH successful
-        // } else if(strncmp(server_reply, UnameWRONGMessage, strlen(UnameWRONGMessage)) == 0
-        //           || strncmp(server_reply, PassWRONGMessage, strlen(PassWRONGMessage)) == 0
-        //           || strncmp(server_reply, ILLEGALMESSAGE, strlen(ILLEGALMESSAGE)) == 0) {
-        //     printf("%s\n", server_reply + strlen(UnameWRONGMessage));
-        //     // Send back reply to the server
-        //     strcpy(client_reply, "Error acknowledged.");
-        //     write(socket_desc, client_reply, strlen(client_reply));
-        // }
-
-        // // Clear buffers
-        // memset(server_reply, 0, sizeof(server_reply)); // reset server_reply buffer
-        // memset(client_reply, 0, sizeof(client_reply)); // reset client_reply buffer
-
+    
          printf("\n>>> ");
     fflush(stdout);
 
@@ -254,31 +352,31 @@ int main(int argc , char **argv)
 	// const struct linger linger_val = { 1, 600 };
     // setsockopt(socket_desc, SOL_SOCKET, SO_LINGER, &linger_val, sizeof(linger_val));
 
-		struct timeval timeout;
-		timeout.tv_sec = 0;
-		timeout.tv_usec = 100;
+		// struct timeval timeout;
+		// timeout.tv_sec = 0;
+		// timeout.tv_usec = 100;
 
-		int flag = 1;
-        int result = setsockopt(socket_desc, IPPROTO_TCP, TCP_NODELAY, (char *) &flag, sizeof(int));
+		// int flag = 1;
+        // int result = setsockopt(socket_desc, IPPROTO_TCP, TCP_NODELAY, (char *) &flag, sizeof(int));
 
-        if (result < 0) {
-            // Handle error here
-            perror("Setting TCP_NODELAY error");
-            // return -1;
-        }
+        // if (result < 0) {
+        //     // Handle error here
+        //     perror("Setting TCP_NODELAY error");
+        //     // return -1;
+        // }
 				
-		int flags = fcntl(socket_desc, F_GETFL, 0);
-		if (flags == -1) {
-			perror("fcntl F_GETFL");
+		// int flags = fcntl(socket_desc, F_GETFL, 0);
+		// if (flags == -1) {
+		// 	perror("fcntl F_GETFL");
 
-		}
+		// }
 
-		// Clear the non-blocking flag
-		flags &= ~O_NONBLOCK;
-		if (fcntl(socket_desc, F_SETFL, flags) == -1) {
-			perror("fcntl F_SETFL");
+		// // Clear the non-blocking flag
+		// flags &= ~O_NONBLOCK;
+		// if (fcntl(socket_desc, F_SETFL, flags) == -1) {
+		// 	perror("fcntl F_SETFL");
 		
-		}
+		// }
 
 
 	char SERVER_IP[BUFSIZ];
@@ -299,11 +397,11 @@ int main(int argc , char **argv)
     // AFTER CONNECTING -> PERFORM AUTH FROM CLIENT SIDE 
     //
     //
-        if(!performAUTH(socket_desc)) {
-        printf("Auth failed\n");
-        return 1;
-    }
-
+    //     if(!performAUTH(socket_desc)) {
+    //     printf("Auth failed\n");
+    //     return 1;
+    // }
+														// /////
 
     ///
     ///
@@ -311,38 +409,44 @@ int main(int argc , char **argv)
     ///
     //
 
-	int choice = 0;
-	while(1)
-	{
-		printf("Enter a choice:\n1- GET\n2- PUT\n3- MGET\n4- MPUT\n5- EXIT\n");
-		scanf("%d", &choice);
-		switch(choice)
-		{
-			case 1:
-				printf("Enter file_name to get: ");
-				scanf("%s", file_name);
-				performGET(file_name,socket_desc);
-				break;
-			case 2:
-				printf("Enter file_name to put: ");
-				scanf("%s", file_name);
-				performPUT(file_name,socket_desc);
-				break;
-			case 3:
-				performMGET(socket_desc);	
-				break;
-			case 4:
-				performMPUT(socket_desc);
-				break;
-			case 5:
-				strcpy(request_msg,"EXIT");
-				write(socket_desc, request_msg, strlen(request_msg));	
-				return 0;
-			default: 
-				printf("Incorrect command\n");
-		}
-	}
-	return 0;
+	  int choice = 0;
+    while(1)
+    {
+        printf("Enter a choice:\n1- GET\n2- PUT\n3- MGET\n4- MPUT\n5- SHOW\n6- SELECT\n7- EXIT\n");
+        scanf("%d", &choice);
+        switch(choice)
+        {
+            case 1:
+                printf("Enter file_name to get: ");
+                scanf("%s", file_name);
+                performGET(file_name,socket_desc);
+                break;
+            case 2:
+                printf("Enter file_name to put: ");
+                scanf("%s", file_name);
+                performPUT(file_name,socket_desc);
+                break;
+            case 3:
+                performMGET(socket_desc);    
+                break;
+            case 4:
+                performMPUT(socket_desc);
+                break;
+            case 5:
+                performSHOW(socket_desc);
+                break;
+            case 6:
+                performSELECT(socket_desc);
+                break;
+            case 7:
+                strcpy(request_msg,"EXIT");
+                write(socket_desc, request_msg, strlen(request_msg));    
+                return 0;
+            default: 
+                printf("Incorrect command\n");
+        }
+    }
+    return 0;
 }
 
 ssize_t readall(int fd, char *buf, size_t bytes)
@@ -382,7 +486,7 @@ int SendFileOverSocket(int socket_desc, char* file_name)
 
 	// sendfile(socket_desc, file_desc, NULL, file_size);
 	//	call_readthread(file_name, &socket_desc);
-	 send_imageCLIENT(socket_desc, file_name);
+	 send_image(socket_desc, file_name);
 	// send_file(file_name, socket_desc);
 
 
@@ -405,7 +509,7 @@ void performGET(char *file_name,int socket_desc){
 	int t;
 	int mode = 1;
 
-	if (mode == 0){
+	
 	if( access( file_name, F_OK ) != -1 )
 	{
 		int abortflag = 0;
@@ -413,6 +517,10 @@ void performGET(char *file_name,int socket_desc){
 		scanf("%d", &abortflag);
 		if(abortflag!=1)
 			return;
+	}
+	else
+	{
+		printf("File doesn't exist at server.ABORTING.\n");
 	}
 	// Get a file from server
 	strcpy(request_msg, "GET ");
@@ -422,222 +530,13 @@ void performGET(char *file_name,int socket_desc){
 	reply_msg[2] = '\0';
 	printf("%s\n", reply_msg);
 	if (strcmp(reply_msg, "OK") == 0)
-	{	
-				//EXTRACT EXTENSION
-
-			char * extension = get_extension(file_name);
-
-						// Extract filename from path
-			char *shortfile = strrchr(file_name, '/');
-			if (shortfile) {
-				shortfile++;  // Skip the '/'
-			} else {
-				shortfile = file_name;
-			}
-
-			// Copy filename to another string for modification
-			char modifiedFilename[128];
-			strncpy(modifiedFilename, file_name, sizeof(modifiedFilename) - 1);
-			modifiedFilename[sizeof(modifiedFilename) - 1] = '\0';  // Null-terminate the string
-
-			// Replace '.' with 'D'
-			for (int i = 0; modifiedFilename[i]; i++) {
-				if (modifiedFilename[i] == '.') {
-				modifiedFilename[i] = '@';
-				}
-			}
-
-
-
-		printf("GOT REPLY MESSAGE\n");
-		char dirName[256];
-        snprintf(dirName, sizeof(dirName), "ChunksTEMP_%s", file_name);
-        mkdir(dirName, 0777); // Create directory with read/write/search permissions for owner and group, and with read/search permissions for others.
-
-		printf("WENT PAST MKDIR\n");
-
-		  // Receive the size of the file
-        char file_size_str[BUFSIZ];
-        recv(socket_desc, file_size_str, BUFSIZ, 0);
-        file_size = atoi(file_size_str);  // Convert the received string to int
-		
-		int count = 0;
-		printf("GOT FILESIZE =%d",file_size);
-
-		int num_chunks = file_size / 8000 + 1; // Calculate the number of chunks that will be received
-
-		printf("NUM CHUNKS = %d",num_chunks);
-		int *received_chunks = calloc(num_chunks, sizeof(int)); // Allocate an array to keep track of received chunks
-
-		while(1) {
-
-			 printf("INSIDE COUNT WHILE\n");
-
-
-			printf("GOT HERE...\n");
-			// Receive data
-			int receivedBytes = 0;
-			// while(receivedBytes < 8000) {
-				
-
-					printf("IN RECV. WHILE\n");
-
-					// Prepare to receive chunk index
-					int index_received = -1;
-					char index_buffer[BUFSIZ];
-
-                    
-					
-
-					// Receive the index from the server
-					recv(socket_desc, index_buffer, BUFSIZ, 0);
-					index_buffer[BUFSIZ - 1] = '\0';  // Null-terminate the received string to make sure it's a valid C-string
-
-					// Convert received string to integer
-					index_received = atoi(index_buffer);
-
-					printf("INDEX RECV : %d",index_received);
-
-					 if (received_chunks[index_received] == 1) {
-						// This chunk was already received, skip it
-						continue;
-					}
-
-			char outputFilename[128];
-			snprintf(outputFilename, sizeof(outputFilename), "%s/%s_%d.%s", dirName, modifiedFilename ,index_received, extension);
-
-			
-			FILE *chunkFile = fopen(outputFilename, "w");
-			if(chunkFile == NULL) {
-				perror("Failed to open chunk file");
-			}
-
-
-				
-
-
-				printf("RECV. DATA \n");
-				char * buffer = malloc(BUFSIZ * sizeof(char));
-			char * buffer_ptr = buffer;
-			int bytes_left = 8000; // expected size of data to receive
-			int bytes_received = 0; // number of bytes received so far
-			fd_set read_fds; // fd_set for select call
-			struct timeval timeout; // timeout for select call
-
-			while (bytes_left > 0) {
-				FD_ZERO(&read_fds); // clear the set
-				FD_SET(socket_desc, &read_fds); // add our socket to the set
-
-		
-				timeout.tv_sec = 5;  // 5 seconds timeout
-				timeout.tv_usec = 0;
-
-				int select_status = select(socket_desc + 1, &read_fds, NULL, NULL, &timeout);
-
-				if (select_status < 0) {
-					perror("select");
-					break;
-				} 
-				else if (select_status == 0) {
-					printf("recv timeout\n");
-					break;
-				} 
-				else {
-					// select_status > 0 means data is available to read
-					int bytes = recv(socket_desc, buffer_ptr, bytes_left, 0);
-					
-					if (bytes < 0) {
-						perror("Failed to receive data");
-						return;
-					}
-					else if (bytes == 0) {
-						printf("Connection closed\n");
-						break;
-					}
-					else {
-						printf("RECV. b = %d \n",bytes);
-					}
-
-					bytes_received += bytes;
-					bytes_left -= bytes;
-					buffer_ptr += bytes;
-				}
-			}
-
-
-		
-			// The entire file has been received, send "DONE" message
-			char *msg = "DONE";
-			if (send(socket_desc, msg, strlen(msg), 0) < 0) {
-				perror("Failed to send DONE message");
-			}
-			else {
-				printf("SENT DONE MESSAGE. \n");
-			}
-
-
-				
-
-			// IGNORE ERROR HERE
-
-			// ACK RESPONSE FOR TCP IGNORE
-			// if ( receivedBytes >= 10 && ignore == 0){
-			printf("FILE WITH INDEX %d GOT THIS : %s\n\n" ,index_received , buffer);
-
-			writeChunkToFile(outputFilename, buffer, bytes_received);
-
-				
-				//}
-			fclose(chunkFile);	
-			receivedBytes += bytes_received;
-			
-			// }
-
-				// Mark this chunk as received
-			received_chunks[index_received] = 1;
-
-			// Check if all chunks have been received
-			int all_received = 1;
-			for (int i = 0; i < num_chunks; i++) {
-				if (received_chunks[i] == 0) {
-					// This chunk has not been received yet
-					all_received = 0;
-					break;
-				}
-			}
-
-
-			ignore = 0;
-			count++;
-		}
-
-		// runReconstruct("DONE.jpg", dirName, count, 8000);
-		printf("COUNT IS = %d\n", count);
-		reconstructFile("DONE2.jpg", dirName, count, 8000);
-
-
-
-		
-
-		free(data);
-		printf("Done receiving data\n");
-
-
-	}
-	else
 	{
-		printf("File doesn't exist at server.ABORTING.\n");
+	
+		receive_image(socket_desc,file_name);
 	}
-	}
-	else {
-		
-
-		receive_imageSERVER(socket_desc,file_name);
-		//receive_file(socket_desc,file_name);
 
 
 
-	}
 
 
 }
@@ -755,13 +654,15 @@ void performMGET(int socket_desc){
 		{
 		
 			// Recieving file size, creating file, getting data and writing in file.
-			recv(socket_desc, &file_size, sizeof(int), 0);
-			data = malloc(file_size+1);
-			FILE *fp = fopen(file_name, "w"); 
-			r = recv(socket_desc, data, file_size, 0);
-			data[r] = '\0';
-			fputs(data, fp);
-			fclose(fp);
+			// recv(socket_desc, &file_size, sizeof(int), 0);
+			// data = malloc(file_size+1);
+			// FILE *fp = fopen(file_name, "w"); 
+			// r = recv(socket_desc, data, file_size, 0);
+			// data[r] = '\0';
+			// fputs(data, fp);
+			// fclose(fp);
+			receive_image(socket_desc, file_name);
+
 			printf("File %s received with size %d\n", file_name,r);
 		}   //////////// HERE
 		else if (strcmp(reply, "OK") == 0 ){
@@ -804,6 +705,7 @@ void performMPUT(int server_socket){
       }
         closedir(d);
 	}
+
     printf("MPUT Complete\n");
 
 }

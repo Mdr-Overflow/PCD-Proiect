@@ -114,7 +114,7 @@ void sigtstpHandler(int sig)
 #define PassWRONGMessage "[0] Password is wrong or illegal ! Try again : "
 #define ILLEGALMESSAGE "ILLEGAL"
 // Statements
-
+#define MAX_BUFFER_SIZE 10240
 
 char *create_schema = "CREATE TABLE IF NOT EXISTS UserTable(\
    UserName TEXT PRIMARY KEY,\
@@ -196,6 +196,77 @@ void removeWhitespace(char *str) {
 
 
 //
+int receive_image(int client_socket, const char *file_name);
+int send_image(int client_socket, const char *file_name);
+
+
+
+int receive_image(int client_socket, const char *file_name) {
+    FILE *image_file = fopen(file_name, "wb");
+    if (image_file == NULL) {
+        perror("Failed to open image file");
+        return -1;
+    }
+
+    char *buffer = (char *)malloc(MAX_BUFFER_SIZE);
+    if (buffer == NULL) {
+        perror("Failed to allocate buffer");
+        fclose(image_file);
+        return -1;
+    }
+
+    int bytes_received;
+    int total_received = 0;
+
+    // Receive image data from client and write to file
+    while ((bytes_received = recv(client_socket, buffer, MAX_BUFFER_SIZE, 0)) > 0) {
+        fwrite(buffer, 1, bytes_received, image_file);
+        total_received += bytes_received;
+    }
+
+    printf("Total received: %d bytes\n", total_received);
+
+    free(buffer);
+    fclose(image_file);
+    return 0;
+}
+
+int send_image(int client_socket, const char *file_name) {
+    FILE *image_file = fopen(file_name, "rb");
+    if (image_file == NULL) {
+        perror("Failed to open image file");
+        return -1;
+    }
+
+    char *buffer = (char *)malloc(MAX_BUFFER_SIZE);
+    if (buffer == NULL) {
+        perror("Failed to allocate buffer");
+        fclose(image_file);
+        return -1;
+    }
+
+    size_t bytes_read;
+
+    // Read image data from file and send to client
+    while ((bytes_read = fread(buffer, 1, MAX_BUFFER_SIZE, image_file)) > 0) {
+        if (send(client_socket, buffer, bytes_read, 0) < 0) {
+            perror("Send failed");
+            free(buffer);
+            fclose(image_file);
+            return -1;
+        }
+    }
+
+    free(buffer);
+    fclose(image_file);
+    return 0;
+}
+
+
+
+
+
+
 
 
 
@@ -925,8 +996,10 @@ void performGET(char *file_name, int socket, char * Uname)
 		
 
 		//Send File + SIZE
-		SendFileOverSocket(socket, file_name);
-         MakeLog(Uname,"FTP","performGET",file_name);
+		    SendFileOverSocket(socket, file_name);
+
+            printf("FILE SENT OVER SOCKET \n");
+      //   MakeLog(Uname,"FTP","performGET",file_name);
 	}
 	else
 	{
@@ -1005,7 +1078,11 @@ void performPUT(char *file_name, int socket,
 
 	// call_serverthread(file_name, socket, file_size);
 
-	receive_imageSERVER(socket,file_name);
+	// receive_imageSERVER(socket,file_name);
+
+    // AICI
+
+    receive_image(socket,file_name);
 
 
 	printf("RECIEVED \n"); 
@@ -1021,40 +1098,51 @@ void performPUT(char *file_name, int socket,
 }
 void performMGET(int socket,char* file_ext, char * Uname){
 
-	printf("Performing MGET request of client\n");
-	DIR *d;
-  	char *p1,*p2;
+	 printf("Performing MGET request of client\n");
+    DIR *d;
+    char *p1,*p2;
     int ret;
     char server_response[BUFSIZ],reply[BUFSIZ];
-
     struct dirent *dir;
+
+    // First pass: count the matching files
+    int file_count = 0;
+    d = opendir(".");
+    if (d) {
+        while ((dir = readdir(d)) != NULL) {
+            p1 = strtok(dir->d_name, ".");
+            p2 = strtok(NULL, ".");
+            if (p2 != NULL && strcmp(p2, file_ext) == 0)
+                file_count++;
+        }
+        closedir(d);
+    }
+
+    // Second pass: perform the operation
     d = opendir(".");
     char full_name[BUFSIZ];
-    if (d)
-    {
-        while ((dir = readdir(d)) != NULL)
-        {
-        	strcpy(full_name,dir->d_name);
-            p1=strtok(dir->d_name,".");
-            p2=strtok(NULL,".");
-            if(p2!=NULL && strcmp(p2,file_ext)==0)
-            {
-
-					write(socket, full_name, strlen(full_name));
-     				int t = recv(socket, reply, 2, 0);
-     				if(!strcmp(reply,"OK"))
-						performGET(full_name,socket,Uname);
+    if (d && file_count > 0) {
+        while ((dir = readdir(d)) != NULL && file_count > 0) {
+            strcpy(full_name, dir->d_name);
+            p1 = strtok(dir->d_name, ".");
+            p2 = strtok(NULL, ".");
+            if (p2 != NULL && strcmp(p2, file_ext) == 0) {
+                file_count--;
+                write(socket, full_name, strlen(full_name));
+                int t = recv(socket, reply, 2, 0);
+                if(!strcmp(reply, "OK"))
+                    performGET(full_name, socket, Uname);
             }
         }
         closedir(d);
 
         // End MGET Request by sending "END"
-        strcpy(server_response,"END");
+        strcpy(server_response, "END");
         write(socket, server_response, strlen(server_response));
     }
-    MakeLog(Uname,"FTP","performMGET","MULTIPLE");  
-}
 
+    MakeLog(Uname, "FTP", "performMGET", "MULTIPLE");
+}
 void performMPUT(int server_socket, FTPthreadArgs_t * args, char * Uname) {
     printf("Performing MPUT\n");
 
@@ -1131,6 +1219,7 @@ void *ConnectionHandler(void * ARGS)
 			case 4:
             	strcpy(file_ext, GetArgumentFromRequest(client_request));
                 performMPUT(socket,args,Uname);
+                break;
 			case 5 : 
 				performSHOW(socket, Uname);
 				break;
@@ -1164,7 +1253,7 @@ bool SendFileOverSocket(int socket_desc, char* file_name)
 
 	// sendfile(socket_desc, file_desc, NULL, file_size);
 	//	call_readthread(file_name, &socket_desc);
-	 send_imageCLIENT(socket_desc, file_name);
+	 send_image(socket_desc, file_name);
 	// send_file(file_name, socket_desc);
 
 
@@ -1207,18 +1296,18 @@ void *inet_main (void *args) {
 	server.sin_addr.s_addr = INADDR_ANY;
 	server.sin_port = htons(SERVER_PORT);
 
-    struct timeval timeout;
-		timeout.tv_sec = 2;
-		timeout.tv_usec = 0;
+    // struct timeval timeout;
+	// 	timeout.tv_sec = 2;
+	// 	timeout.tv_usec = 0;
 
-		int flag = 1;
-        int result = setsockopt(socket_desc, IPPROTO_TCP, TCP_NODELAY, (char *) &flag, sizeof(int));
+	// 	int flag = 1;
+    //     int result = setsockopt(socket_desc, IPPROTO_TCP, TCP_NODELAY, (char *) &flag, sizeof(int));
 
-        if (result < 0) {
-            // Handle error here
-            perror("Setting TCP_NODELAY error");
-            // return -1;
-        }
+    //     if (result < 0) {
+    //         // Handle error here
+    //         perror("Setting TCP_NODELAY error");
+    //         // return -1;
+    //     }
 
 	if (bind(socket_desc, (struct sockaddr *)&server, sizeof(server)) < 0)
 	{
@@ -1226,8 +1315,8 @@ void *inet_main (void *args) {
 		// EXIT
 	}
 
-	const struct linger linger_val = { 1, 600 };
-    setsockopt(socket_desc, SOL_SOCKET, SO_LINGER, &linger_val, sizeof(linger_val));
+	// const struct linger linger_val = { 1, 600 };
+    // setsockopt(socket_desc, SOL_SOCKET, SO_LINGER, &linger_val, sizeof(linger_val));
 
     char NumeHostServer[MAXHOSTNAME];
     memset(NumeHostServer, 0, sizeof(NumeHostServer));
@@ -1292,15 +1381,18 @@ void *inet_main (void *args) {
         ThreadARGS[con] = ARG;
 
          // PERFORM AUTH FOR "USER" : 1
-         struct client* client = performAUTH(socket_client, 1);
-          if ( client != NULL) {
+        //  struct client* client = performAUTH(socket_client, 1);
+        //   if ( client != NULL) {
         
-                ARG->Uname = client->username;   
-          }  
-          else {
-            continue;
-            //AND MESSAGE TO CLIENT
-          }
+        //         ARG->Uname = client->username;   
+        //   }  
+        //   else {
+        //     continue;
+        //     //AND MESSAGE TO CLIENT
+        //   }
+
+        ARG->Uname = "AAAA";
+
 
 		pthread_create(&sniffer_thread, NULL, ConnectionHandler, (void*) ARG);
 		
