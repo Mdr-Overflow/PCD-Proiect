@@ -104,7 +104,36 @@ int main(int argc, char * argv[]) {
     exit(1);
   }
 
-  printf("Conectat la server. Introduceti mesaje (\"exit\" pentru a inchide):\n");
+
+
+  printf("Conectat la server. \n");
+  printf("Sending test message ...  \n");
+ 
+  //
+
+  printf("Introduceti mesaje (\"exit\" pentru a inchide):\n");
+  // TEST RECIEVE 
+  char * testline = "test";
+ 
+  if (write(sockfd, testline, strlen(testline)) < 0) {
+      perror("EROARE client: nu pot sa trimit mesajul la server");
+      close(sockfd);
+      exit(EXIT_FAILURE);
+    }
+
+  if ((n = read(sockfd, recvline, MAXLINE)) < 0) {
+      perror("EROARE client: nu pot sa citesc raspunsul de la server");
+      close(sockfd);
+      exit(1);
+    }
+
+  recvline[n] = '\0'; // adaugam terminatorul de sir
+
+  printf("::: %s :::", recvline);
+
+  fflush(stdout);
+
+
 
   while (keep_running) {
     // Citirea mesajului de la tastatura

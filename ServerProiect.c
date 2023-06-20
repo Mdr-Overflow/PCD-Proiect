@@ -103,10 +103,18 @@ CREATE TABLE IF NOT EXISTS File (\
    FileID INTEGER PRIMARY KEY AUTOINCREMENT,\
    FileName TEXT UNIQUE,\
    UserID TEXT,\
-   FileBuffer BLOB,\
+   FileDataID INTEGER,\
    FOREIGN KEY (UserID) REFERENCES UserTable(UserName)\
-   ON DELETE CASCADE\
-   ON UPDATE CASCADE\
+    ON DELETE CASCADE\
+    ON UPDATE CASCADE,\
+   FOREIGN KEY (FileDataID) REFERENCES FileData(FileDataID)\
+    ON DELETE CASCADE\
+    ON UPDATE CASCADE\
+);\
+\
+CREATE TABLE IF NOT EXISTS FileData (\
+   FileDataID INTEGER PRIMARY KEY AUTOINCREMENT,\
+   FileBuffer BLOB\
 );\
 \
 CREATE TABLE IF NOT EXISTS Logs (\
@@ -132,6 +140,27 @@ CREATE TABLE IF NOT EXISTS Logs (\
 // daca userul inchide serverul neasteptat , interceptam semnalul si trimitem 
 // SIGQUIT catre 'main' process deoarece prin aceasta metoda socketul/rile nu raman ocupate in "SIG_WAIT"
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+
+/// UTILS
+
+
+
+void removeWhitespace(char *str) {
+    char *src = str, *dst = str;
+    while (*src != '\0') {
+        if (*src == ' ' || *src == '\n') {
+            src++;
+        } else {
+            *dst++ = *src++;
+        }
+    }
+    *dst = '\0';
+}
+
+
+
+//
 
 
 
@@ -210,7 +239,7 @@ void SetupDataBase(){
 
 void getUserInfo(char * username, char * pass) {
     
-    printf("PPPPPPPPPPPPPPPPPPPP");
+  //  printf("PAAAAAARCHET \n");
     sqlite3 *db;
     int rc = sqlite3_open("pcdProiect.db", &db);
     if (rc != SQLITE_OK) {
@@ -228,34 +257,31 @@ void getUserInfo(char * username, char * pass) {
         exit(1);
     }
 
+    removeWhitespace(username);
+
     rc = sqlite3_bind_text(stmt, 1, username, -1, SQLITE_TRANSIENT);
     int step = sqlite3_step(stmt);
 
-    // char *Uname = malloc(sizeof(char) * MAXUNAME);
-    // Uname = NULL;
-    // char *Pass = malloc(sizeof(char) * MAXUNAME);
-    // Pass = NULL;
-    
+  
     //printf("%s <0000 \n",username); GETS HERE
-    if (step == SQLITE_ROW) { // WONT ENTER
-        
-        printf("%s <0000 \n",username);
+    // if (step == SQLITE_ROW) { // WONT ENTER
+        if ( step == SQLITE_ROW){
         strcpy(pass,sqlite3_column_text(stmt, 0));
-        printf("%s <1111 \n",username);
-       
+      
         printf("%s\n ", username);
         printf("%s\n ", pass);
-    } 
+        }
+    // } 
     // if nothing found
     else {
-        // Problem WAS here
-        strcpy(username,"NaN");
-        strcpy(pass,"NaN");
+         // Problem WAS here
+         strcpy(username,"NaN");
+         strcpy(pass,"NaN");
         
-    }
+     }
     sqlite3_finalize(stmt);
     sqlite3_close(db);
-    
+   // printf("CCCCCCCCCC  \n");
     //free(Uname);
     //free(Pass);
 
@@ -294,6 +320,7 @@ bool isAuthUNAME(pid_t clientPID, char * ClientUserName ){
     char * pass = malloc(sizeof(char) * MAXUNAME);
     // pass = NULL; DONT DO THIS IF U WANT TO COPY ON TOP OF IT
     getUserInfo(ClientUserName,pass);
+    printf("uname is = %s \n", ClientUserName);
     if ( strcmp(ClientUserName,"NaN") == 0 || strcmp(ClientUserName,ILLEGALMESSAGE) == 0 ){
         return false;
     }
@@ -308,24 +335,16 @@ bool isAuthPASS(pid_t clientPID, char * ClientUserName , char * ClientPassword){
     // Initial nu criptam ca sa fie mai usor !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     encrypt(ClientPassword);
     getUserInfo(ClientUserName,pass);
-    if ( strcmp(pass,ClientPassword)){
+    printf("\nPASS IS = %s \n",pass);
+    printf("\nTyped Pass IS = %s \n",ClientPassword);
+    if ( strcmp(pass,ClientPassword) == 0){
         return true;
     }
     else false;
 
 }
 
-void removeWhitespace(char *str) {
-    char *src = str, *dst = str;
-    while (*src != '\0') {
-        if (*src == ' ' || *src == '\n') {
-            src++;
-        } else {
-            *dst++ = *src++;
-        }
-    }
-    *dst = '\0';
-}
+
 
 void PostUsername(char * Uname){
 
@@ -421,10 +440,12 @@ bool createUNAME(pid_t uname , char * ClientUserName){
 bool createPASS(pid_t uname , char * ClientUserName, char * Pass){
     
     PostPass(Pass, ClientUserName);
-    if ( (Pass,ILLEGALMESSAGE) == 0  || Pass == NULL){
-        return true;
+    // fails here
+  
+    if ( strcmp(Pass,ILLEGALMESSAGE) == 0  || Pass == NULL){
+        return false;
     }
-    else false;
+    else true;
 
 
 }
@@ -505,7 +526,7 @@ int main(int argc, char * argv[]) {
 
   int authstate = 0;
   char * Uname = malloc(sizeof(char) * MAXUNAME); 
-
+  int stage = 0;
 
   /**
   bind - realizează legătura între un descriptor de soclu anterior creat şi o adresă locală finală de
@@ -556,7 +577,8 @@ int main(int argc, char * argv[]) {
 
         {
           line[strlen(line)+1] = '\0'; // set EOB - end buffer
-          
+
+
     /*
 
     if(illegalCheck(pass)){ Send("FUCK YOU"); Continue; }
@@ -564,6 +586,7 @@ int main(int argc, char * argv[]) {
     */
 
             removeWhitespace(Uname);
+            printf("line = %s\n",line );
 
           //  printf("OOOOOOOOOOOOOOO\n");
 
@@ -642,7 +665,7 @@ int main(int argc, char * argv[]) {
 
                 if (authstate == 111){
 
-                    if ( isAuthPASS(getpid(),Uname,line))
+                    if ( isAuthPASS(getpid(),Uname,line) == true)
                     {
 
                         send(newsockfd, "Login Successful", strlen("Login Successful"), 0);
@@ -690,7 +713,7 @@ int main(int argc, char * argv[]) {
 
                 if (authstate == 101){
 
-                    if ( createPASS(getpid(),Uname,line))
+                    if ( createPASS(getpid(),Uname,line) == true)
                     {
 
                         send(newsockfd, "Login Successful", strlen("Login Successful"), 0);
